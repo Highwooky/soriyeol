@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="소리결">
+<meta name="theme-color" content="#0D1015">
+<title>소리결 — 폰에서 끝내는 뮤직비디오</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='44' fill='%230D1015'/><circle cx='50' cy='50' r='30' fill='none' stroke='%233ECFB2' stroke-width='6'/><circle cx='50' cy='50' r='14' fill='%23E8603C'/></svg>">
+<style>
+:root{
+  --bg:#0D1015; --surface:#151A21; --surface2:#1B222B; --line:#242E3A;
+  --text:#E8ECF1; --sub:#8B95A3; --accent:#3ECFB2; --hot:#E8603C; --gold:#D9B36C;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{font-size:16px}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:-apple-system,"Apple SD Gothic Neo","Pretendard",system-ui,sans-serif;
+  padding:env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 40px);
+  overscroll-behavior-y:none;
+}
+.wrap{max-width:560px;margin:0 auto;padding:0 16px}
+header{padding:26px 0 10px}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand h1{font-size:1.9rem;font-weight:800;letter-spacing:-0.03em}
+.brand h1 em{font-style:normal;color:var(--accent)}
+.brand span{font-size:.72rem;color:var(--sub);letter-spacing:.14em}
+.tagline{color:var(--sub);font-size:.85rem;margin-top:6px;line-height:1.5}
+
+.step{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin-top:14px}
+.step-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.step-num{width:24px;height:24px;border-radius:50%;background:var(--surface2);border:1px solid var(--line);
+  color:var(--accent);font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+.step-num.done{background:var(--accent);color:#06231d;border-color:var(--accent)}
+.step-head h2{font-size:1rem;font-weight:700;letter-spacing:-0.01em}
+.step-head small{margin-left:auto;color:var(--sub);font-size:.72rem}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  border:1px solid var(--line);background:var(--surface2);color:var(--text);
+  border-radius:12px;padding:12px 16px;font-size:.9rem;font-weight:600;cursor:pointer;
+  transition:opacity .15s, transform .1s;font-family:inherit}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--accent);color:#06231d;border-color:var(--accent)}
+.btn.hot{background:var(--hot);color:#fff;border-color:var(--hot)}
+.btn.full{width:100%}
+.btn:disabled{opacity:.35;pointer-events:none}
+.btn.small{padding:8px 12px;font-size:.8rem;border-radius:10px}
+
+.dropzone{border:1.5px dashed var(--line);border-radius:14px;padding:26px 14px;text-align:center;color:var(--sub);font-size:.85rem;cursor:pointer}
+.dropzone strong{color:var(--text)}
+.filemeta{display:none;margin-top:10px;background:var(--surface2);border-radius:12px;padding:12px;font-size:.82rem;line-height:1.6}
+.filemeta b{color:var(--accent)}
+
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.label{font-size:.75rem;color:var(--sub);margin:14px 0 6px;letter-spacing:.06em}
+.label:first-child{margin-top:0}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface2);color:var(--sub);
+  border-radius:999px;padding:8px 14px;font-size:.8rem;font-weight:600;cursor:pointer;font-family:inherit}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#06231d}
+.chip.hot.on{background:var(--hot);border-color:var(--hot);color:#fff}
+
+input[type=range]{width:100%;accent-color:var(--accent)}
+input[type=text]{width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:12px;
+  color:var(--text);padding:12px;font-size:.9rem;font-family:inherit;outline:none}
+input[type=text]:focus{border-color:var(--accent)}
+
+.meter{display:flex;gap:8px;margin-top:10px}
+.meter .cell{flex:1;background:var(--surface2);border-radius:12px;padding:10px;text-align:center}
+.meter .cell .v{font-size:1.05rem;font-weight:800;letter-spacing:-0.02em}
+.meter .cell .k{font-size:.65rem;color:var(--sub);margin-top:2px;letter-spacing:.08em}
+.v.ok{color:var(--accent)} .v.warn{color:var(--gold)}
+
+.tabs{display:flex;background:var(--surface2);border-radius:12px;padding:3px;gap:3px}
+.tabs button{flex:1;border:none;background:transparent;color:var(--sub);padding:9px 4px;border-radius:10px;
+  font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit}
+.tabs button.on{background:var(--accent);color:#06231d}
+.tabpane{display:none;margin-top:12px}
+.tabpane.on{display:block}
+
+.swatches{display:flex;gap:10px}
+.sw{width:34px;height:34px;border-radius:50%;border:2.5px solid transparent;cursor:pointer}
+.sw.on{border-color:#fff}
+
+.previewbox{position:relative;border-radius:14px;overflow:hidden;background:#000;margin-top:4px}
+#previewCanvas{display:block;width:100%}
+.prevctl{display:flex;gap:8px;margin-top:10px}
+
+.progresswrap{display:none;margin-top:14px}
+.pbar{height:8px;background:var(--surface2);border-radius:99px;overflow:hidden}
+.pbar>div{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--gold));transition:width .3s linear}
+.ptext{display:flex;justify-content:space-between;font-size:.75rem;color:var(--sub);margin-top:6px}
+
+.result{display:none;margin-top:14px}
+.result video{width:100%;border-radius:14px;background:#000}
+.notice{font-size:.75rem;color:var(--sub);line-height:1.65;margin-top:10px}
+.notice b{color:var(--gold)}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 20px);transform:translateX(-50%) translateY(80px);
+  background:var(--surface2);border:1px solid var(--line);color:var(--text);padding:12px 18px;border-radius:14px;
+  font-size:.85rem;opacity:0;transition:.3s;z-index:99;max-width:90vw;text-align:center}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-height:1.7}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="brand"><h1>소리<em>결</em></h1><span>SORI-GYEOL · MV MAKER</span></div>
+  <p class="tagline">음원 하나로 마스터링부터 비주얼라이저 영상까지, 아이폰 안에서 전부.</p>
+</header>
+
+<!-- ① 음원 -->
+<section class="step">
+  <div class="step-head"><div class="step-num" id="n1">1</div><h2>음원 불러오기</h2><small>MP3 / WAV / M4A</small></div>
+  <div class="dropzone" id="dropzone"><strong>탭해서 음원 선택</strong><br>Suno에서 받은 파일 그대로 OK</div>
+  <input type="file" id="audioInput" accept="audio/*,.mp3,.wav,.m4a,.aac,.flac" hidden>
+  <div class="filemeta" id="fileMeta"></div>
+</section>
+
+<!-- ② 사운드 -->
+<section class="step">
+  <div class="step-head"><div class="step-num" id="n2">2</div><h2>사운드 · 자동 마스터링</h2><small>-14 LUFS 유튜브 기준</small></div>
+  <div class="label">마스터링 프리셋</div>
+  <div class="chips" id="presetChips">
+    <button class="chip on" data-v="clean">클린</button>
+    <button class="chip" data-v="punch">펀치</button>
+    <button class="chip" data-v="warm">웜</button>
+    <button class="chip" data-v="off">노멀라이즈만</button>
+  </div>
+  <div class="label">타깃 라우드니스: <b id="lufsLabel" style="color:var(--text)">-14.0 LUFS</b></div>
+  <input type="range" id="lufsRange" min="-18" max="-9" step="0.5" value="-14">
+  <div class="meter">
+    <div class="cell"><div class="v" id="mLufsIn">–</div><div class="k">원본 LUFS</div></div>
+    <div class="cell"><div class="v" id="mLufsOut">–</div><div class="k">결과 LUFS</div></div>
+    <div class="cell"><div class="v" id="mPeak">–</div><div class="k">피크 dB</div></div>
+  </div>
+  <div style="margin-top:12px" class="row">
+    <button class="btn primary" id="btnProcess" disabled>사운드 적용</button>
+    <button class="btn" id="btnWav" disabled>마스터 WAV 저장</button>
+  </div>
+</section>
+
+<!-- ③ 배경 -->
+<section class="step">
+  <div class="step-head"><div class="step-num" id="n3">3</div><h2>배경 이미지</h2></div>
+  <div class="tabs" id="bgTabs">
+    <button class="on" data-t="art">생성 아트</button>
+    <button data-t="photo">사진</button>
+    <button data-t="ai">AI 생성</button>
+  </div>
+  <div class="tabpane on" data-t="art">
+    <div class="label">무드</div>
+    <div class="chips" id="moodChips">
+      <button class="chip on" data-v="dawn">새벽 안개</button>
+      <button class="chip" data-v="ink">먹과 한지</button>
+      <button class="chip" data-v="neon">네온 서울</button>
+      <button class="chip" data-v="dusk">노을</button>
+      <button class="chip" data-v="celadon">청자</button>
+    </div>
+    <div style="margin-top:12px"><button class="btn small" id="btnReart">↻ 다시 생성</button></div>
+  </div>
+  <div class="tabpane" data-t="photo">
+    <button class="btn full" id="btnPhoto">사진 앱에서 선택</button>
+    <input type="file" id="photoInput" accept="image/*" hidden>
+  </div>
+  <div class="tabpane" data-t="ai">
+    <input type="text" id="aiPrompt" placeholder="예: korean hanok village at night, neon lights, cinematic">
+    <div style="margin-top:10px" class="row">
+      <button class="btn small primary" id="btnAiGen">이미지 생성</button>
+      <span style="font-size:.72rem;color:var(--sub)">무료 외부 서비스(Pollinations) · 인터넷 필요 · 실패 시 재시도</span>
+    </div>
+  </div>
+</section>
+
+<!-- ④ 화면 -->
+<section class="step">
+  <div class="step-head"><div class="step-num" id="n4">4</div><h2>화면 구성</h2></div>
+  <div class="label">비율</div>
+  <div class="chips" id="ratioChips">
+    <button class="chip on" data-v="169">16:9 유튜브</button>
+    <button class="chip" data-v="916">9:16 쇼츠</button>
+    <button class="chip" data-v="11">1:1</button>
+  </div>
+  <div class="label">비주얼라이저</div>
+  <div class="chips" id="vizChips">
+    <button class="chip on" data-v="ring">장단 링</button>
+    <button class="chip" data-v="bars">스펙트럼</button>
+    <button class="chip" data-v="wave">웨이브폼</button>
+    <button class="chip" data-v="none">없음</button>
+  </div>
+  <div class="label">포인트 색</div>
+  <div class="swatches" id="swatches">
+    <div class="sw on" data-v="#3ECFB2" style="background:#3ECFB2"></div>
+    <div class="sw" data-v="#E8603C" style="background:#E8603C"></div>
+    <div class="sw" data-v="#D9B36C" style="background:#D9B36C"></div>
+    <div class="sw" data-v="#5B8CFF" style="background:#5B8CFF"></div>
+    <div class="sw" data-v="#F2F2F2" style="background:#F2F2F2"></div>
+  </div>
+  <div class="label">곡 제목</div>
+  <input type="text" id="titleInput" placeholder="곡 제목">
+  <div class="label">아티스트 / 부제</div>
+  <input type="text" id="artistInput" placeholder="아티스트명 (비우면 표시 안 함)">
+  <div class="label">기타</div>
+  <div class="chips">
+    <button class="chip on" id="chipText">제목 표시</button>
+    <button class="chip on" id="chipProg">진행바 표시</button>
+    <button class="chip on" id="chipMonitor">렌더 중 소리</button>
+  </div>
+</section>
+
+<!-- ⑤ 미리보기 & 렌더 -->
+<section class="step">
+  <div class="step-head"><div class="step-num" id="n5">5</div><h2>미리보기 · 렌더</h2></div>
+  <div class="previewbox"><canvas id="previewCanvas" width="960" height="540"></canvas></div>
+  <div class="prevctl">
+    <button class="btn" id="btnPreview" disabled>▶ 미리듣기</button>
+    <div style="margin-left:auto"></div>
+    <button class="btn small" id="qBtn" data-v="1080">화질 1080p</button>
+  </div>
+  <button class="btn hot full" id="btnRender" style="margin-top:12px" disabled>● 영상 렌더 시작</button>
+  <div class="progresswrap" id="progressWrap">
+    <div class="pbar"><div id="pFill"></div></div>
+    <div class="ptext"><span id="pTime">0:00</span><span>렌더 중 — 화면을 끄지 마세요</span><span id="pTotal">0:00</span></div>
+    <button class="btn small full" id="btnCancel" style="margin-top:10px">취소</button>
+  </div>
+  <div class="result" id="resultBox">
+    <video id="resultVideo" controls playsinline></video>
+    <a class="btn primary full" id="btnDownload" style="margin-top:10px">영상 저장</a>
+    <p class="notice">아이폰: 저장 버튼 → 공유 시트에서 <b>"비디오 저장"</b>을 누르면 사진 앱에 들어갑니다. 이후 유튜브 앱에서 바로 업로드하세요.</p>
+  </div>
+  <p class="notice">렌더는 곡 길이만큼 실시간으로 진행됩니다 (3분 곡 = 약 3분). 진행 중 다른 앱으로 이동하거나 화면을 잠그면 녹화가 멈춥니다.</p>
+</section>
+
+<footer>소리결 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ============================================================
+   소리결 (Sori-Gyeol) — 폰 단독 뮤직비디오 메이커
+   오디오: Web Audio API (LUFS 측정/노멀라이즈/마스터링/리미터)
+   영상:   Canvas + captureStream + MediaRecorder (H.264 mp4 on iOS)
+   ============================================================ */
+
+// ---------- 전역 상태 ----------
+const S = {
+  ctx: null,               // AudioContext (사용자 제스처 후 생성)
+  rawBuffer: null,         // 원본 AudioBuffer
+  procBuffer: null,        // 마스터링 완료 AudioBuffer
+  fileName: "",
+  preset: "clean",
+  targetLUFS: -14,
+  lufsIn: null, lufsOut: null, peakOut: null,
+  bgMode: "art",           // art | photo | ai
+  mood: "dawn",
+  artSeed: Math.floor(Math.random()*1e9),
+  bgImage: null,           // 렌더용 배경 (canvas 또는 Image/ImageBitmap)
+  ratio: "169",
+  viz: "ring",
+  accent: "#3ECFB2",
+  showText: true, showProg: true, monitor: true,
+  quality: 1080,
+  playing: false, rendering: false,
+  playNodes: null,         // {src, analyser, gain}
+  recorder: null, recChunks: [],
+  wakeLock: null,
+  ringAngle: 0,
+};
+
+const $ = id => document.getElementById(id);
+const toast = (msg, ms=2600) => {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove("show"), ms);
+};
+const fmtTime = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`;
+const db = x => 20*Math.log10(Math.max(x,1e-9));
+
+function getCtx(){
+  if(!S.ctx) S.ctx = new (window.AudioContext||window.webkitAudioContext)();
+  if(S.ctx.state === "suspended") S.ctx.resume();
+  return S.ctx;
+}
+
+// ---------- 시드 난수 (생성 아트 재현용) ----------
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// ============================================================
+// 1) 오디오 분석/처리: BS.1770 LUFS + 마스터링 + 리미터
+// ============================================================
+
+// RBJ 바이쿼드 계수 (K-weighting 근사에 사용)
+function biquadHighShelf(sr, f0, gainDB, Q){
+  const A = Math.pow(10, gainDB/40), w0 = 2*Math.PI*f0/sr;
+  const cw = Math.cos(w0), sw = Math.sin(w0);
+  const alpha = sw/(2*Q), sq = 2*Math.sqrt(A)*alpha;
+  const b0 =    A*((A+1)+(A-1)*cw+sq), b1 = -2*A*((A-1)+(A+1)*cw), b2 = A*((A+1)+(A-1)*cw-sq);
+  const a0 =      (A+1)-(A-1)*cw+sq,   a1 =  2*((A-1)-(A+1)*cw),   a2 =   (A+1)-(A-1)*cw-sq;
+  return [b0/a0, b1/a0, b2/a0, a1/a0, a2/a0];
+}
+function biquadHighPass(sr, f0, Q){
+  const w0 = 2*Math.PI*f0/sr, cw = Math.cos(w0), sw = Math.sin(w0), alpha = sw/(2*Q);
+  const b0 = (1+cw)/2, b1 = -(1+cw), b2 = (1+cw)/2;
+  const a0 = 1+alpha, a1 = -2*cw, a2 = 1-alpha;
+  return [b0/a0, b1/a0, b2/a0, a1/a0, a2/a0];
+}
+function biquadRun(x, c){
+  // Direct Form 1 — 정밀도보다 명료함 우선
+  const y = new Float32Array(x.length);
+  let x1=0,x2=0,y1=0,y2=0;
+  const [b0,b1,b2,a1,a2] = c;
+  for(let i=0;i<x.length;i++){
+    const xi = x[i];
+    const yi = b0*xi + b1*x1 + b2*x2 - a1*y1 - a2*y2;
+    x2=x1; x1=xi; y2=y1; y1=yi; y[i]=yi;
+  }
+  return y;
+}
+
+// ITU-R BS.1770-4 통합 라우드니스 (게이팅 포함)
+function measureLUFS(buffer){
+  const sr = buffer.sampleRate;
+  // K-weighting: 프리필터(하이셸프 +4dB) + RLB(하이패스 38Hz)
+  const shelf = biquadHighShelf(sr, 1681.97, 3.99984, 0.70717);
+  const hp    = biquadHighPass(sr, 38.1355, 0.50033);
+  const nCh = Math.min(buffer.numberOfChannels, 2);
+  const filtered = [];
+  for(let c=0;c<nCh;c++){
+    filtered.push(biquadRun(biquadRun(buffer.getChannelData(c), shelf), hp));
+  }
+  const blockLen = Math.round(0.4*sr), hop = Math.round(0.1*sr);
+  const loudness = [], energies = [];
+  for(let start=0; start+blockLen<=buffer.length; start+=hop){
+    let e = 0;
+    for(let c=0;c<nCh;c++){
+      const d = filtered[c]; let s = 0;
+      for(let i=start;i<start+blockLen;i++) s += d[i]*d[i];
+      e += s/blockLen;               // 채널 가중치 L/R = 1.0
+    }
+    if(e>0){ energies.push(e); loudness.push(-0.691 + 10*Math.log10(e)); }
+  }
+  if(!loudness.length) return -70;
+  // 절대 게이트 -70 LUFS
+  let sum=0,n=0;
+  for(let i=0;i<loudness.length;i++) if(loudness[i]>-70){ sum+=energies[i]; n++; }
+  if(!n) return -70;
+  const relThresh = -0.691 + 10*Math.log10(sum/n) - 10;   // 상대 게이트 -10
+  let sum2=0,n2=0;
+  for(let i=0;i<loudness.length;i++) if(loudness[i]>relThresh){ sum2+=energies[i]; n2++; }
+  if(!n2) return -70;
+  return -0.691 + 10*Math.log10(sum2/n2);
+}
+
+// 블록 기반 룩어헤드 리미터 — 노멀라이즈 후 피크 보호
+function limiter(channels, ceiling){
+  const len = channels[0].length, B = 128;
+  const nb = Math.ceil(len/B);
+  const g = new Float32Array(nb).fill(1);
+  for(let b=0;b<nb;b++){
+    let peak = 0;
+    const end = Math.min((b+1)*B, len);
+    for(let i=b*B;i<end;i++)
+      for(const ch of channels){ const a = Math.abs(ch[i]); if(a>peak) peak=a; }
+    if(peak>ceiling) g[b] = ceiling/peak;
+  }
+  // 어택(역방향): 피크 도달 전에 미리 게인을 내림 (프리덕)
+  for(let b=nb-2;b>=0;b--) g[b] = Math.min(g[b], g[b+1]+0.12);
+  // 릴리즈(정방향): 천천히 복귀
+  for(let b=1;b<nb;b++) g[b] = Math.min(g[b], g[b-1]+0.02);
+  // 블록 게인 선형 보간 적용 + 안전 클립
+  for(const ch of channels){
+    for(let i=0;i<len;i++){
+      const fb = i/B, b0 = Math.floor(fb), b1 = Math.min(b0+1, nb-1), f = fb-b0;
+      let v = ch[i] * (g[b0]*(1-f) + g[b1]*f);
+      if(v> 0.997) v =  0.997;
+      if(v<-0.997) v = -0.997;
+      ch[i] = v;
+    }
+  }
+}
+
+// 마스터링 프리셋 → OfflineAudioContext 그래프
+function buildChain(off, src, preset){
+  let node = src;
+  const eq = (type, f, gain, q) => {
+    const n = off.createBiquadFilter();
+    n.type = type; n.frequency.value = f;
+    if(gain !== undefined) n.gain.value = gain;
+    if(q !== undefined) n.Q.value = q;
+    node.connect(n); node = n;
+  };
+  const comp = (th, ratio, atk, rel) => {
+    const c = off.createDynamicsCompressor();
+    c.threshold.value = th; c.ratio.value = ratio; c.knee.value = 6;
+    c.attack.value = atk; c.release.value = rel;
+    node.connect(c); node = c;
+  };
+  eq("highpass", 28, undefined, 0.71);          // 초저역 정리 (모든 프리셋 공통)
+  if(preset === "clean"){ comp(-18, 2, 0.010, 0.25); }
+  else if(preset === "punch"){
+    eq("lowshelf", 90, 1.5); eq("peaking", 300, -1.0, 1.0); eq("highshelf", 8000, 1.5);
+    comp(-20, 3, 0.005, 0.15);
+  }
+  else if(preset === "warm"){
+    eq("lowshelf", 120, 2.0); eq("highshelf", 10000, -1.0);
+    comp(-16, 2, 0.015, 0.30);
+  }
+  node.connect(off.destination);
+}
+
+async function processAudio(){
+  if(!S.rawBuffer) return;
+  const btn = $("btnProcess"); btn.disabled = true; btn.textContent = "처리 중…";
+  await new Promise(r=>setTimeout(r,30)); // UI 갱신 여유
+  try{
+    const buf = S.rawBuffer;
+    let rendered = buf;
+    if(S.preset !== "off"){
+      const off = new OfflineAudioContext(buf.numberOfChannels, buf.length, buf.sampleRate);
+      const src = off.createBufferSource(); src.buffer = buf;
+      buildChain(off, src, S.preset);
+      src.start();
+      rendered = await off.startRendering();
+    }
+    // 노멀라이즈: 측정 → 게인 → 리미터
+    const lufs = measureLUFS(rendered);
+    const gainDB = S.targetLUFS - lufs;
+    const gain = Math.pow(10, gainDB/20);
+    const out = new AudioBuffer({numberOfChannels: rendered.numberOfChannels,
+      length: rendered.length, sampleRate: rendered.sampleRate});
+    const chans = [];
+    for(let c=0;c<rendered.numberOfChannels;c++){
+      const s = rendered.getChannelData(c), d = out.getChannelData(c);
+      for(let i=0;i<s.length;i++) d[i] = s[i]*gain;
+      chans.push(d);
+    }
+    limiter(chans, Math.pow(10, -1/20));   // 실링 -1 dBFS
+    S.procBuffer = out;
+    S.lufsOut = measureLUFS(out);
+    let pk = 0;
+    for(const ch of chans) for(let i=0;i<ch.length;i++){ const a=Math.abs(ch[i]); if(a>pk) pk=a; }
+    S.peakOut = db(pk);
+    $("mLufsOut").textContent = S.lufsOut.toFixed(1);
+    $("mLufsOut").className = "v ok";
+    $("mPeak").textContent = S.peakOut.toFixed(1);
+    $("mPeak").className = "v " + (S.peakOut <= -0.8 ? "ok" : "warn");
+    $("n2").classList.add("done");
+    $("btnWav").disabled = false;
+    $("btnPreview").disabled = false;
+    $("btnRender").disabled = false;
+    toast("✓ 마스터링 완료 — " + S.lufsOut.toFixed(1) + " LUFS");
+  }catch(err){
+    console.error("[소리결] 오디오 처리 실패:", err);
+    toast("오디오 처리 실패: " + err.message);
+  }finally{
+    btn.disabled = false; btn.textContent = "사운드 적용";
+  }
+}
+
+// 24-bit PCM WAV 인코딩 (마스터 파일 저장용)
+function encodeWAV24(buffer){
+  const nCh = buffer.numberOfChannels, sr = buffer.sampleRate, len = buffer.length;
+  const bytesPerSample = 3, blockAlign = nCh*bytesPerSample;
+  const dataSize = len*blockAlign;
+  const ab = new ArrayBuffer(44 + dataSize);
+  const dv = new DataView(ab);
+  const wstr = (o,s)=>{ for(let i=0;i<s.length;i++) dv.setUint8(o+i, s.charCodeAt(i)); };
+  wstr(0,"RIFF"); dv.setUint32(4, 36+dataSize, true); wstr(8,"WAVE");
+  wstr(12,"fmt "); dv.setUint32(16,16,true); dv.setUint16(20,1,true);
+  dv.setUint16(22,nCh,true); dv.setUint32(24,sr,true);
+  dv.setUint32(28,sr*blockAlign,true); dv.setUint16(32,blockAlign,true); dv.setUint16(34,24,true);
+  wstr(36,"data"); dv.setUint32(40,dataSize,true);
+  let o = 44;
+  const chs = []; for(let c=0;c<nCh;c++) chs.push(buffer.getChannelData(c));
+  for(let i=0;i<len;i++){
+    for(let c=0;c<nCh;c++){
+      let v = Math.max(-1, Math.min(1, chs[c][i]));
+      const iv = Math.round(v * 8388607);
+      dv.setUint8(o, iv & 0xFF); dv.setUint8(o+1, (iv>>8)&0xFF); dv.setUint8(o+2, (iv>>16)&0xFF);
+      o += 3;
+    }
+  }
+  return new Blob([ab], {type:"audio/wav"});
+}
+
+// ============================================================
+// 2) 배경 이미지: 생성 아트 / 사진 / AI
+// ============================================================
+const MOODS = {
+  dawn:    { base:["#0b1d2e","#12354f"], orbs:["#3d6a8f","#7fa8c9","#b9d3e8"], grain:.05 },
+  ink:     { base:["#efe7d3","#d9cdb4"], orbs:["#2b2620","#4a4238","#171512"], grain:.09 },
+  neon:    { base:["#0a0a12","#161327"], orbs:["#3ecfb2","#e8603c","#7b5cff","#2a9df4"], grain:.05 },
+  dusk:    { base:["#1a0f14","#5e2a2b"], orbs:["#c95d3f","#e8b872","#8a3b4a"], grain:.06 },
+  celadon: { base:["#0e1a19","#1d3a37"], orbs:["#3ecfb2","#9adcd0","#2a6b5f"], grain:.05 },
+};
+
+let grainCanvas = null;
+function getGrain(){
+  if(grainCanvas) return grainCanvas;
+  grainCanvas = document.createElement("canvas");
+  grainCanvas.width = grainCanvas.height = 160;
+  const g = grainCanvas.getContext("2d");
+  const img = g.createImageData(160,160);
+  for(let i=0;i<img.data.length;i+=4){
+    const v = Math.random()*255;
+    img.data[i]=img.data[i+1]=img.data[i+2]=v; img.data[i+3]=255;
+  }
+  g.putImageData(img,0,0);
+  return grainCanvas;
+}
+
+function generateArt(mood, seed, w, h){
+  const cfg = MOODS[mood] || MOODS.dawn;
+  const rnd = mulberry32(seed);
+  const c = document.createElement("canvas"); c.width=w; c.height=h;
+  const x = c.getContext("2d");
+  // 베이스 그라디언트
+  const lg = x.createLinearGradient(0,0,w*0.3,h);
+  lg.addColorStop(0,cfg.base[0]); lg.addColorStop(1,cfg.base[1]);
+  x.fillStyle = lg; x.fillRect(0,0,w,h);
+  // 오브 (부드러운 방사형 광원) — 블러 필터 없이 그라디언트만으로 (iOS 호환)
+  const nOrb = 6 + Math.floor(rnd()*5);
+  for(let i=0;i<nOrb;i++){
+    const ox = rnd()*w, oy = rnd()*h;
+    const r = (0.18 + rnd()*0.4) * Math.max(w,h);
+    const col = cfg.orbs[Math.floor(rnd()*cfg.orbs.length)];
+    const rg = x.createRadialGradient(ox,oy,0,ox,oy,r);
+    rg.addColorStop(0, col + "66");
+    rg.addColorStop(1, col + "00");
+    x.globalCompositeOperation = (mood==="ink") ? "multiply" : "lighter";
+    x.fillStyle = rg;
+    x.beginPath(); x.arc(ox,oy,r,0,Math.PI*2); x.fill();
+  }
+  x.globalCompositeOperation = "source-over";
+  // 비네트
+  const vg = x.createRadialGradient(w/2,h/2,Math.min(w,h)*0.35, w/2,h/2, Math.max(w,h)*0.75);
+  vg.addColorStop(0,"rgba(0,0,0,0)"); vg.addColorStop(1,"rgba(0,0,0,0.45)");
+  x.fillStyle = vg; x.fillRect(0,0,w,h);
+  // 그레인 (한지 질감)
+  x.globalAlpha = cfg.grain;
+  x.fillStyle = x.createPattern(getGrain(),"repeat");
+  x.fillRect(0,0,w,h);
+  x.globalAlpha = 1;
+  return c;
+}
+
+function refreshArt(newSeed){
+  if(newSeed) S.artSeed = Math.floor(Math.random()*1e9);
+  S.bgImage = generateArt(S.mood, S.artSeed, 1920, 1080);
+  drawFrame(null);
+}
+
+async function loadAiImage(){
+  const prompt = $("aiPrompt").value.trim();
+  if(!prompt){ toast("프롬프트를 입력하세요"); return; }
+  const btn = $("btnAiGen"); btn.disabled = true; btn.textContent = "생성 중…";
+  try{
+    const [w,h] = S.ratio==="916" ? [1080,1920] : S.ratio==="11" ? [1440,1440] : [1920,1080];
+    const url = "https://image.pollinations.ai/prompt/" + encodeURIComponent(prompt)
+      + `?width=${w}&height=${h}&nologo=true&seed=${Math.floor(Math.random()*99999)}`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error("서버 응답 " + res.status);
+    const blob = await res.blob();
+    S.bgImage = await createImageBitmap(blob);
+    drawFrame(null);
+    toast("✓ AI 배경 적용됨");
+  }catch(err){
+    console.error("[소리결] AI 이미지 실패:", err);
+    toast("이미지 생성 실패 — 잠시 후 재시도하거나 생성 아트를 사용하세요", 3500);
+  }finally{
+    btn.disabled = false; btn.textContent = "이미지 생성";
+  }
+}
+
+// ============================================================
+// 3) 렌더링: 그리기 공통 함수
+// ============================================================
+function drawCover(x, img, w, h){
+  const iw = img.width, ih = img.height;
+  const s = Math.max(w/iw, h/ih);
+  const dw = iw*s, dh = ih*s;
+  x.drawImage(img, (w-dw)/2, (h-dh)/2, dw, dh);
+}
+
+function bandLevels(freq, n){
+  // 로그 스케일에 가까운 밴드 묶기 (저역 과대표현 방지)
+  const out = new Float32Array(n);
+  const maxBin = Math.floor(freq.length*0.72);
+  let prev = 2;
+  for(let i=0;i<n;i++){
+    let end = Math.floor(Math.pow(maxBin, (i+1)/n));
+    if(end<=prev) end = prev+1;
+    let s=0,cnt=0;
+    for(let b=prev;b<Math.min(end,maxBin);b++){ s+=freq[b]; cnt++; }
+    out[i] = cnt ? (s/cnt)/255 : 0;
+    prev = end;
+  }
+  return out;
+}
+
+// 메인 프레임 드로우 — 미리보기/본렌더 공용
+function drawFrame(audio, progress){
+  const targets = [];
+  const pv = $("previewCanvas");
+  targets.push({canvas: pv});
+  if(S.rendering && S.renderCanvas) targets.push({canvas: S.renderCanvas});
+
+  let freq=null, wave=null, bass=0;
+  if(audio && audio.analyser){
+    freq = new Uint8Array(audio.analyser.frequencyBinCount);
+    audio.analyser.getByteFrequencyData(freq);
+    wave = new Uint8Array(audio.analyser.fftSize);
+    audio.analyser.getByteTimeDomainData(wave);
+    let s=0; for(let i=2;i<14;i++) s+=freq[i];
+    bass = s/(12*255);
+  }
+  S.ringAngle += 0.004 + bass*0.02;
+
+  for(const t of targets){
+    const c = t.canvas, x = c.getContext("2d");
+    const w = c.width, h = c.height;
+    // 배경
+    if(S.bgImage) drawCover(x, S.bgImage, w, h);
+    else { x.fillStyle="#0D1015"; x.fillRect(0,0,w,h); }
+    // 가독성 오버레이
+    const og = x.createLinearGradient(0,h*0.55,0,h);
+    og.addColorStop(0,"rgba(0,0,0,0)"); og.addColorStop(1,"rgba(0,0,0,0.55)");
+    x.fillStyle = og; x.fillRect(0,0,w,h);
+
+    // 비주얼라이저
+    x.save();
+    if(S.viz==="bars" && freq){
+      const n=64, bw = w/n*0.62, gap = w/n*0.38;
+      const lv = bandLevels(freq, n);
+      x.fillStyle = S.accent;
+      x.shadowColor = S.accent; x.shadowBlur = h*0.015;
+      for(let i=0;i<n;i++){
+        const bh = Math.max(h*0.006, lv[i]*lv[i]*h*0.34);
+        x.fillRect(i*(bw+gap)+gap/2, h*0.86-bh, bw, bh);
+      }
+    }
+    else if(S.viz==="wave" && wave){
+      x.strokeStyle = S.accent; x.lineWidth = Math.max(2, h*0.004);
+      x.shadowColor = S.accent; x.shadowBlur = h*0.012;
+      x.beginPath();
+      const step = Math.max(1, Math.floor(wave.length/w));
+      for(let i=0, px=0; i<wave.length; i+=step, px++){
+        const y = h*0.72 + (wave[i]-128)/128 * h*0.16;
+        if(px===0) x.moveTo(0,y); else x.lineTo(px*(w/(wave.length/step)),y);
+      }
+      x.stroke();
+    }
+    else if(S.viz==="ring"){
+      // 시그니처: 장단 링 — 저역 펄스로 숨쉬는 원형 스펙트럼
+      const cx=w/2, cy=h*0.44;
+      const base = Math.min(w,h)*(0.16 + bass*0.03);
+      const n=96;
+      const lv = freq ? bandLevels(freq,n) : new Float32Array(n).fill(0.08);
+      x.translate(cx,cy); x.rotate(S.ringAngle);
+      x.strokeStyle = S.accent; x.lineWidth = Math.max(2, Math.min(w,h)*0.006);
+      x.shadowColor = S.accent; x.shadowBlur = Math.min(w,h)*0.02;
+      x.lineCap = "round";
+      for(let i=0;i<n;i++){
+        const a = i/n*Math.PI*2;
+        const l = base + lv[i]*lv[i]*Math.min(w,h)*0.20;
+        x.beginPath();
+        x.moveTo(Math.cos(a)*base, Math.sin(a)*base);
+        x.lineTo(Math.cos(a)*l, Math.sin(a)*l);
+        x.stroke();
+      }
+      // 중심 고리
+      x.beginPath(); x.arc(0,0,base*0.82,0,Math.PI*2);
+      x.globalAlpha=.5; x.stroke(); x.globalAlpha=1;
+      x.setTransform(1,0,0,1,0,0);
+    }
+    x.restore();
+
+    // 텍스트
+    if(S.showText){
+      const title = $("titleInput").value.trim() || S.fileName.replace(/\.[^.]+$/,"");
+      const artist = $("artistInput").value.trim();
+      if(title){
+        x.textAlign="center"; x.fillStyle="#fff";
+        x.shadowColor="rgba(0,0,0,.6)"; x.shadowBlur=h*0.01; x.shadowOffsetY=h*0.003;
+        x.font = `800 ${Math.round(h*0.055)}px -apple-system,"Apple SD Gothic Neo",sans-serif`;
+        x.fillText(title, w/2, h*0.90);
+        if(artist){
+          x.font = `500 ${Math.round(h*0.028)}px -apple-system,"Apple SD Gothic Neo",sans-serif`;
+          x.fillStyle="rgba(255,255,255,.75)";
+          x.fillText(artist, w/2, h*0.945);
+        }
+        x.shadowBlur=0; x.shadowOffsetY=0;
+      }
+    }
+    // 진행바
+    if(S.showProg && progress !== undefined && progress !== null){
+      x.fillStyle="rgba(255,255,255,.18)";
+      x.fillRect(0, h-Math.max(3,h*0.006), w, Math.max(3,h*0.006));
+      x.fillStyle = S.accent;
+      x.fillRect(0, h-Math.max(3,h*0.006), w*Math.min(1,progress), Math.max(3,h*0.006));
+    }
+  }
+}
+
+// ---------- 미리듣기 ----------
+function makePlayNodes(monitorOn){
+  const ctx = getCtx();
+  const src = ctx.createBufferSource();
+  src.buffer = S.procBuffer || S.rawBuffer;
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.8;
+  const gain = ctx.createGain();
+  gain.gain.value = monitorOn ? 1 : 0;
+  src.connect(analyser);
+  analyser.connect(gain);
+  gain.connect(ctx.destination);
+  return {src, analyser, gain};
+}
+
+let previewRAF = null;
+function stopPreview(){
+  if(S.playNodes){ try{S.playNodes.src.stop();}catch(e){} S.playNodes=null; }
+  S.playing = false;
+  cancelAnimationFrame(previewRAF);
+  $("btnPreview").textContent = "▶ 미리듣기";
+  drawFrame(null);
+}
+function startPreview(){
+  if(S.rendering) return;
+  const nodes = makePlayNodes(true);
+  S.playNodes = nodes; S.playing = true;
+  const t0 = getCtx().currentTime;
+  const dur = nodes.src.buffer.duration;
+  nodes.src.start();
+  nodes.src.onended = stopPreview;
+  $("btnPreview").textContent = "■ 정지";
+  const loop = ()=>{
+    if(!S.playing) return;
+    drawFrame(nodes, (getCtx().currentTime - t0)/dur);
+    previewRAF = requestAnimationFrame(loop);
+  };
+  loop();
+}
+
+// ============================================================
+// 4) 본 렌더: canvas.captureStream + MediaRecorder
+// ============================================================
+function pickMime(){
+  const cands = [
+    'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
+    "video/mp4",
+    'video/webm;codecs="vp9,opus"',
+    "video/webm",
+  ];
+  for(const m of cands){
+    if(window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m;
+  }
+  return null;
+}
+
+async function startRender(){
+  if(!S.procBuffer && !S.rawBuffer){ toast("먼저 음원을 불러오세요"); return; }
+  if(!S.procBuffer){ toast("먼저 '사운드 적용'을 눌러주세요"); return; }
+  const mime = pickMime();
+  if(!mime){ toast("이 브라우저는 영상 녹화를 지원하지 않습니다 (iOS 사파리 권장)", 4000); return; }
+
+  const ctx = getCtx();
+  const dims = {
+    "169": S.quality===1080 ? [1920,1080] : [1280,720],
+    "916": S.quality===1080 ? [1080,1920] : [720,1280],
+    "11" : S.quality===1080 ? [1080,1080] : [720,720],
+  }[S.ratio];
+  const rc = document.createElement("canvas");
+  rc.width = dims[0]; rc.height = dims[1];
+  S.renderCanvas = rc;
+
+  // 오디오 경로: source → analyser → recDest (+모니터)
+  const src = ctx.createBufferSource(); src.buffer = S.procBuffer;
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.8;
+  const recDest = ctx.createMediaStreamDestination();
+  const mon = ctx.createGain(); mon.gain.value = S.monitor ? 1 : 0;
+  src.connect(analyser); analyser.connect(recDest); analyser.connect(mon); mon.connect(ctx.destination);
+
+  const vStream = rc.captureStream(30);
+  const stream = new MediaStream([...vStream.getVideoTracks(), ...recDest.stream.getAudioTracks()]);
+  const recorder = new MediaRecorder(stream, {mimeType:mime, videoBitsPerSecond: 12_000_000});
+  S.recChunks = [];
+  recorder.ondataavailable = e => { if(e.data && e.data.size) S.recChunks.push(e.data); };
+  recorder.onstop = () => finishRender(mime);
+  S.recorder = recorder;
+
+  // 화면 꺼짐 방지
+  try{ if(navigator.wakeLock) S.wakeLock = await navigator.wakeLock.request("screen"); }catch(e){}
+
+  const dur = S.procBuffer.duration;
+  $("pTotal").textContent = fmtTime(dur);
+  $("progressWrap").style.display = "block";
+  $("resultBox").style.display = "none";
+  $("btnRender").disabled = true;
+  $("btnPreview").disabled = true;
+  S.rendering = true;
+
+  recorder.start(1000);
+  const t0 = ctx.currentTime;
+  src.start();
+  const nodes = {analyser};
+  src.onended = ()=> setTimeout(()=>{ if(S.rendering) recorder.stop(); }, 350);
+  S.renderStop = ()=>{ try{src.stop();}catch(e){} try{recorder.stop();}catch(e){} };
+
+  const loop = ()=>{
+    if(!S.rendering) return;
+    const p = (ctx.currentTime - t0)/dur;
+    drawFrame(nodes, p);
+    $("pFill").style.width = Math.min(100, p*100)+"%";
+    $("pTime").textContent = fmtTime(Math.min(dur, ctx.currentTime - t0));
+    requestAnimationFrame(loop);
+  };
+  loop();
+  toast("렌더 시작 — 화면을 켠 채로 기다려주세요");
+}
+
+function finishRender(mime){
+  S.rendering = false;
+  S.renderCanvas = null;
+  if(S.wakeLock){ try{S.wakeLock.release();}catch(e){} S.wakeLock=null; }
+  $("progressWrap").style.display = "none";
+  $("btnRender").disabled = false;
+  $("btnPreview").disabled = false;
+  if(!S.recChunks.length){ toast("녹화 데이터가 없습니다 — 화면이 꺼졌을 수 있어요", 4000); return; }
+  const ext = mime.includes("mp4") ? "mp4" : "webm";
+  const blob = new Blob(S.recChunks, {type: mime.split(";")[0]});
+  const url = URL.createObjectURL(blob);
+  const title = ($("titleInput").value.trim() || S.fileName.replace(/\.[^.]+$/,"") || "output");
+  $("resultVideo").src = url;
+  const a = $("btnDownload");
+  a.href = url; a.download = `[MV] ${title}.${ext}`;
+  $("resultBox").style.display = "block";
+  $("n5").classList.add("done");
+  toast("✓ 렌더 완료 (" + (blob.size/1048576).toFixed(1) + " MB)");
+  $("resultBox").scrollIntoView({behavior:"smooth"});
+}
+
+function cancelRender(){
+  if(S.renderStop) S.renderStop();
+  S.rendering = false;
+  S.recChunks = [];
+  $("progressWrap").style.display = "none";
+  $("btnRender").disabled = false;
+  $("btnPreview").disabled = false;
+  toast("렌더 취소됨");
+}
+
+// ============================================================
+// 5) UI 배선
+// ============================================================
+function bindChips(elId, cb){
+  $(elId).addEventListener("click", e=>{
+    const b = e.target.closest(".chip"); if(!b) return;
+    for(const c of $(elId).querySelectorAll(".chip")) c.classList.remove("on");
+    b.classList.add("on");
+    cb(b.dataset.v);
+  });
+}
+
+function setRatioCanvas(){
+  const pv = $("previewCanvas");
+  if(S.ratio==="916"){ pv.width=540; pv.height=960; }
+  else if(S.ratio==="11"){ pv.width=720; pv.height=720; }
+  else { pv.width=960; pv.height=540; }
+  if(S.bgMode==="art") refreshArt(false);
+  else drawFrame(null);
+}
+
+async function onAudioFile(file){
+  if(!file) return;
+  stopPreview();
+  try{
+    toast("음원 분석 중…");
+    const ab = await file.arrayBuffer();
+    const buf = await getCtx().decodeAudioData(ab);
+    S.rawBuffer = buf; S.procBuffer = null; S.fileName = file.name;
+    S.lufsIn = measureLUFS(buf);
+    $("fileMeta").style.display = "block";
+    $("fileMeta").innerHTML =
+      `<b>${file.name}</b><br>` +
+      `${fmtTime(buf.duration)} · ${buf.numberOfChannels}ch · ${(buf.sampleRate/1000).toFixed(1)}kHz`;
+    $("mLufsIn").textContent = S.lufsIn.toFixed(1);
+    $("mLufsOut").textContent = "–"; $("mLufsOut").className="v";
+    $("mPeak").textContent = "–"; $("mPeak").className="v";
+    $("n1").classList.add("done");
+    $("btnProcess").disabled = false;
+    $("btnWav").disabled = true;
+    $("btnPreview").disabled = true;
+    $("btnRender").disabled = true;
+    if(!$("titleInput").value) $("titleInput").value = file.name.replace(/\.[^.]+$/,"");
+    drawFrame(null);
+    toast("✓ 로드 완료 — 원본 " + S.lufsIn.toFixed(1) + " LUFS");
+  }catch(err){
+    console.error("[소리결] 디코딩 실패:", err);
+    toast("이 파일을 읽을 수 없습니다: " + err.message, 4000);
+  }
+}
+
+function init(){
+  $("dropzone").addEventListener("click", ()=>$("audioInput").click());
+  $("audioInput").addEventListener("change", e=>onAudioFile(e.target.files[0]));
+
+  bindChips("presetChips", v=>{ S.preset=v; });
+  $("lufsRange").addEventListener("input", e=>{
+    S.targetLUFS = parseFloat(e.target.value);
+    $("lufsLabel").textContent = S.targetLUFS.toFixed(1) + " LUFS";
+  });
+  $("btnProcess").addEventListener("click", processAudio);
+  $("btnWav").addEventListener("click", ()=>{
+    if(!S.procBuffer) return;
+    const blob = encodeWAV24(S.procBuffer);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    const title = $("titleInput").value.trim() || "master";
+    a.download = `[MASTER] ${title}.wav`;
+    a.click();
+    toast("24bit WAV 저장 — 공유 시트에서 파일 앱 선택");
+  });
+
+  $("bgTabs").addEventListener("click", e=>{
+    const b = e.target.closest("button"); if(!b) return;
+    for(const t of $("bgTabs").querySelectorAll("button")) t.classList.remove("on");
+    b.classList.add("on");
+    S.bgMode = b.dataset.t;
+    for(const p of document.querySelectorAll(".tabpane"))
+      p.classList.toggle("on", p.dataset.t===S.bgMode);
+    if(S.bgMode==="art") refreshArt(false);
+  });
+  bindChips("moodChips", v=>{ S.mood=v; refreshArt(true); });
+  $("btnReart").addEventListener("click", ()=>refreshArt(true));
+  $("btnPhoto").addEventListener("click", ()=>$("photoInput").click());
+  $("photoInput").addEventListener("change", async e=>{
+    const f = e.target.files[0]; if(!f) return;
+    try{
+      S.bgImage = await createImageBitmap(f);
+      drawFrame(null); toast("✓ 사진 배경 적용됨");
+    }catch(err){ toast("사진을 열 수 없습니다"); }
+  });
+  $("btnAiGen").addEventListener("click", loadAiImage);
+
+  bindChips("ratioChips", v=>{ S.ratio=v; setRatioCanvas(); });
+  bindChips("vizChips", v=>{ S.viz=v; drawFrame(null); });
+  $("swatches").addEventListener("click", e=>{
+    const s = e.target.closest(".sw"); if(!s) return;
+    for(const el of $("swatches").querySelectorAll(".sw")) el.classList.remove("on");
+    s.classList.add("on");
+    S.accent = s.dataset.v; drawFrame(null);
+  });
+  $("titleInput").addEventListener("input", ()=>drawFrame(null));
+  $("artistInput").addEventListener("input", ()=>drawFrame(null));
+  const toggle = (id, key)=> $(id).addEventListener("click", ()=>{
+    S[key] = !S[key];
+    $(id).classList.toggle("on", S[key]);
+    drawFrame(null);
+  });
+  toggle("chipText","showText");
+  toggle("chipProg","showProg");
+  toggle("chipMonitor","monitor");
+
+  $("qBtn").addEventListener("click", ()=>{
+    S.quality = S.quality===1080 ? 720 : 1080;
+    $("qBtn").textContent = "화질 " + S.quality + "p";
+  });
+  $("btnPreview").addEventListener("click", ()=> S.playing ? stopPreview() : startPreview());
+  $("btnRender").addEventListener("click", startRender);
+  $("btnCancel").addEventListener("click", cancelRender);
+
+  document.addEventListener("visibilitychange", ()=>{
+    // iOS: 백그라운드 전환 시 rAF/녹화 중단 → 사용자에게 고지
+    if(document.hidden && S.rendering) console.warn("[소리결] 렌더 중 백그라운드 전환 감지");
+  });
+
+  refreshArt(false);
+}
+init();
+</script>
+</body>
+</html>
