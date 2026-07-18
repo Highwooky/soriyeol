@@ -166,14 +166,16 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   </div>
   <div class="tabpane" data-t="photo">
     <button class="btn full" id="btnPhoto">사진 앱에서 선택</button>
-    <input type="file" id="photoInput" accept="image/*" hidden>
+    <input type="file" id="photoInput" accept="image/*" multiple hidden>
+    <p style="font-size:.72rem;color:var(--sub);margin-top:8px">여러 장 선택하면 곡 진행에 맞춰 슬라이드쇼로 전환됩니다</p>
   </div>
   <div class="tabpane" data-t="ai">
     <input type="text" id="aiPrompt" placeholder="예: korean hanok village at night, neon lights, cinematic">
     <div style="margin-top:10px" class="row">
       <button class="btn small primary" id="btnAiGen">이미지 생성</button>
-      <span style="font-size:.72rem;color:var(--sub)">무료 외부 서비스(Pollinations) · 인터넷 필요 · 실패 시 재시도</span>
+      <button class="btn small" id="btnAiAdd">＋ 슬라이드 추가</button>
     </div>
+    <p id="slideInfo" style="font-size:.72rem;color:var(--sub);margin-top:8px">무료 외부 서비스(Pollinations) · 인터넷 필요 · 실패 시 재시도</p>
   </div>
 </section>
 
@@ -191,6 +193,10 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
     <button class="chip on" data-v="ring">장단 링</button>
     <button class="chip" data-v="bars">스펙트럼</button>
     <button class="chip" data-v="wave">웨이브폼</button>
+    <button class="chip" data-v="burst">파티클</button>
+    <button class="chip" data-v="aurora">오로라</button>
+    <button class="chip" data-v="lp">LP 레코드</button>
+    <button class="chip" data-v="dots">별자리</button>
     <button class="chip" data-v="none">없음</button>
   </div>
   <div class="label">포인트 색</div>
@@ -205,6 +211,19 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <input type="text" id="titleInput" placeholder="곡 제목">
   <div class="label">아티스트 / 부제</div>
   <input type="text" id="artistInput" placeholder="아티스트명 (비우면 표시 안 함)">
+  <div class="label">배경 모션</div>
+  <div class="chips">
+    <button class="chip on" id="chipKb">켄번즈 줌</button>
+    <button class="chip on" id="chipPump">비트 펌핑</button>
+    <button class="chip" id="chipMood">무드 시프트</button>
+  </div>
+  <div class="label">마감 효과</div>
+  <div class="chips">
+    <button class="chip on" id="chipFade">페이드 인/아웃</button>
+    <button class="chip" id="chipFx">그레인·빛샘</button>
+  </div>
+  <div class="label">비주얼라이저 감도: <b id="sensLabel" style="color:var(--text)">1.0×</b></div>
+  <input type="range" id="sensRange" min="0.5" max="2" step="0.1" value="1">
   <div class="label">기타</div>
   <div class="chips">
     <button class="chip on" id="chipText">제목 표시</button>
@@ -236,7 +255,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p class="notice">렌더는 곡 길이만큼 실시간으로 진행됩니다 (3분 곡 = 약 3분). 진행 중 다른 앱으로 이동하거나 화면을 잠그면 녹화가 멈춥니다.</p>
 </section>
 
-<footer>소리결 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)</footer>
+<footer>소리결 v1.1 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)</footer>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -261,11 +280,19 @@ const S = {
   bgMode: "art",           // art | photo | ai
   mood: "dawn",
   artSeed: Math.floor(Math.random()*1e9),
-  bgImage: null,           // 렌더용 배경 (canvas 또는 Image/ImageBitmap)
+  slides: [],              // 배경 슬라이드 (2장 이상이면 크로스페이드 슬라이드쇼)
+  kbSeeds: [],             // 슬라이드별 켄번즈 줌/팬 방향 시드
   ratio: "169",
   viz: "ring",
   accent: "#3ECFB2",
   showText: true, showProg: true, monitor: true,
+  kb: true, pump: true, moodShift: false, fade: true, fxOverlay: false,
+  sens: 1.0,
+  curDur: 0,
+  bassAvg: 0.05, beatPulse: 0, beatCool: 0,
+  particles: [],
+  smoothBands: null,
+  lpAngle: 0,
   quality: 1080,
   playing: false, rendering: false,
   playNodes: null,         // {src, analyser, gain}
@@ -557,16 +584,28 @@ function generateArt(mood, seed, w, h){
   return c;
 }
 
-function refreshArt(newSeed){
-  if(newSeed) S.artSeed = Math.floor(Math.random()*1e9);
-  S.bgImage = generateArt(S.mood, S.artSeed, 1920, 1080);
+function setSlides(list){
+  S.slides = list;
+  // 슬라이드마다 켄번즈 방향이 달라지도록 개별 시드 부여
+  S.kbSeeds = list.map(()=>Math.floor(Math.random()*1e9));
+  const el = $("slideInfo");
+  if(el) el.textContent = S.slides.length>1
+    ? `슬라이드 ${S.slides.length}장 — 곡 진행에 맞춰 크로스페이드`
+    : "무료 외부 서비스(Pollinations) · 인터넷 필요 · 실패 시 재시도";
   drawFrame(null);
 }
 
-async function loadAiImage(){
+function refreshArt(newSeed){
+  if(newSeed) S.artSeed = Math.floor(Math.random()*1e9);
+  setSlides([generateArt(S.mood, S.artSeed, 1920, 1080)]);
+}
+
+async function loadAiImage(append){
   const prompt = $("aiPrompt").value.trim();
   if(!prompt){ toast("프롬프트를 입력하세요"); return; }
-  const btn = $("btnAiGen"); btn.disabled = true; btn.textContent = "생성 중…";
+  const btn = append ? $("btnAiAdd") : $("btnAiGen");
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = "생성 중…";
   try{
     const [w,h] = S.ratio==="916" ? [1080,1920] : S.ratio==="11" ? [1440,1440] : [1920,1080];
     const url = "https://image.pollinations.ai/prompt/" + encodeURIComponent(prompt)
@@ -574,14 +613,15 @@ async function loadAiImage(){
     const res = await fetch(url);
     if(!res.ok) throw new Error("서버 응답 " + res.status);
     const blob = await res.blob();
-    S.bgImage = await createImageBitmap(blob);
-    drawFrame(null);
-    toast("✓ AI 배경 적용됨");
+    const img = await createImageBitmap(blob);
+    if(append && S.slides.length) setSlides([...S.slides, img]);
+    else setSlides([img]);
+    toast(append ? `✓ 슬라이드 추가 (${S.slides.length}장)` : "✓ AI 배경 적용됨");
   }catch(err){
     console.error("[소리결] AI 이미지 실패:", err);
     toast("이미지 생성 실패 — 잠시 후 재시도하거나 생성 아트를 사용하세요", 3500);
   }finally{
-    btn.disabled = false; btn.textContent = "이미지 생성";
+    btn.disabled = false; btn.textContent = orig;
   }
 }
 
@@ -611,8 +651,97 @@ function bandLevels(freq, n){
   return out;
 }
 
+// ---------- 비트 감지 & 파티클 ----------
+function updateBeat(bass, dt){
+  // 저역 에너지 이동평균 대비 급상승 = 비트 (감쇠형 펄스 생성)
+  S.bassAvg += (bass - S.bassAvg) * Math.min(1, dt*1.2);
+  S.beatCool = Math.max(0, S.beatCool - dt);
+  if(bass > S.bassAvg*1.35 + 0.03 && S.beatCool<=0 && bass>0.08){
+    S.beatPulse = 1; S.beatCool = 0.18;
+    if(S.viz==="burst") spawnBurst(Math.min(1, bass));
+  }
+  S.beatPulse *= Math.pow(0.04, dt);
+}
+function spawnBurst(strength){
+  // 좌표는 0~1 정규화 → 해상도(미리보기/본렌더)에 무관하게 동일 동작
+  const n = 18 + Math.floor(strength*22);
+  for(let i=0; i<n && S.particles.length<260; i++){
+    const a = Math.random()*Math.PI*2;
+    const sp = 0.12 + Math.random()*0.4*(0.6+strength);
+    S.particles.push({x:0.5, y:0.5, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp*0.7,
+      life:1, max:0.9+Math.random()*0.6, r:0.004+Math.random()*0.007});
+  }
+}
+function stepParticles(dt){
+  const drag = Math.pow(0.6, dt);
+  for(const p of S.particles){
+    p.x += p.vx*dt; p.y += p.vy*dt;
+    p.vx *= drag; p.vy = p.vy*drag - 0.02*dt;   // 살짝 떠오르는 여운
+    p.life -= dt/p.max;
+  }
+  S.particles = S.particles.filter(p=>p.life>0);
+}
+
+// ---------- 배경 드로우 (켄번즈 + 슬라이드쇼 + 펌핑 + 무드시프트) ----------
+function drawKb(x, img, w, h, lp, seed, extraZoom, alpha){
+  // 슬라이드별 시드로 줌 방향/팬 방향 고정 → 렌더 내내 일관된 움직임
+  const rnd = mulberry32(seed);
+  const z0 = 1.05 + rnd()*0.03, z1 = 1.12 + rnd()*0.08;
+  const rev = rnd() < 0.5;
+  const dx = rnd()*2-1, dy = rnd()*2-1;
+  const t = S.kb ? Math.min(1, Math.max(0, lp)) : 0;
+  const z = (rev ? z1 + (z0-z1)*t : z0 + (z1-z0)*t) * extraZoom;
+  const iw = img.width, ih = img.height;
+  const s = Math.max(w/iw, h/ih) * z;
+  const dw = iw*s, dh = ih*s;
+  const panX = (dw-w)/2, panY = (dh-h)/2;
+  const ox = (w-dw)/2 + (S.kb ? dx*panX*(t*0.6-0.3) : 0);
+  const oy = (h-dh)/2 + (S.kb ? dy*panY*(t*0.6-0.3) : 0);
+  x.globalAlpha = alpha;
+  x.drawImage(img, ox, oy, dw, dh);
+  x.globalAlpha = 1;
+}
+function drawBackground(x, w, h, progress){
+  const slides = S.slides;
+  if(!slides.length){ x.fillStyle="#0D1015"; x.fillRect(0,0,w,h); return; }
+  const pumpZ = S.pump ? 1 + S.beatPulse*0.035 : 1;
+  const n = slides.length;
+  if(n === 1){
+    drawKb(x, slides[0], w, h, progress, S.kbSeeds[0]||1, pumpZ, 1);
+  }else{
+    const pos = Math.min(0.9999, progress) * n;
+    const idx = Math.floor(pos), local = pos - idx;
+    const FADE = 0.18;   // 각 슬라이드 말미 18% 구간에서 크로스페이드
+    drawKb(x, slides[idx], w, h, local, S.kbSeeds[idx]||1, pumpZ, 1);
+    if(local > 1-FADE && idx+1 < n){
+      drawKb(x, slides[idx+1], w, h, 0, S.kbSeeds[idx+1]||1, pumpZ, (local-(1-FADE))/FADE);
+    }
+  }
+  if(S.moodShift){
+    // 곡 진행에 따라 색조가 서서히 순환 (soft-light라 원본을 해치지 않음)
+    const hue = (190 + 200*progress) % 360;
+    x.globalCompositeOperation = "soft-light";
+    x.fillStyle = `hsla(${hue.toFixed(0)},70%,55%,0.33)`;
+    x.fillRect(0,0,w,h);
+    x.globalCompositeOperation = "source-over";
+  }
+  if(S.pump && S.beatPulse > 0.03){
+    x.globalCompositeOperation = "soft-light";
+    x.fillStyle = `rgba(255,255,255,${(S.beatPulse*0.25).toFixed(3)})`;
+    x.fillRect(0,0,w,h);
+    x.globalCompositeOperation = "source-over";
+  }
+}
+
 // 메인 프레임 드로우 — 미리보기/본렌더 공용
+let lastFrameT = performance.now();
 function drawFrame(audio, progress){
+  const now = performance.now();
+  const dt = Math.min(0.05, (now - lastFrameT)/1000) || 0.016;
+  lastFrameT = now;
+  const tSec = now/1000;
+  const p = (progress === undefined || progress === null) ? null : progress;
+
   const targets = [];
   const pv = $("previewCanvas");
   targets.push({canvas: pv});
@@ -625,22 +754,37 @@ function drawFrame(audio, progress){
     wave = new Uint8Array(audio.analyser.fftSize);
     audio.analyser.getByteTimeDomainData(wave);
     let s=0; for(let i=2;i<14;i++) s+=freq[i];
-    bass = s/(12*255);
+    bass = Math.min(1, s/(12*255) * S.sens);
   }
+  updateBeat(bass, dt);
+  stepParticles(dt);
   S.ringAngle += 0.004 + bass*0.02;
+
+  // 스무딩된 밴드 (오로라/별자리용 — 출렁임을 부드럽게)
+  if(!S.smoothBands) S.smoothBands = new Float32Array(64);
+  if(freq){
+    const cur = bandLevels(freq, 64);
+    for(let i=0;i<64;i++){
+      const v = Math.min(1, cur[i]*S.sens);
+      S.smoothBands[i] += (v - S.smoothBands[i]) * 0.25;
+    }
+  }else{
+    for(let i=0;i<64;i++) S.smoothBands[i] *= 0.95;
+  }
 
   for(const t of targets){
     const c = t.canvas, x = c.getContext("2d");
     const w = c.width, h = c.height;
-    // 배경
-    if(S.bgImage) drawCover(x, S.bgImage, w, h);
-    else { x.fillStyle="#0D1015"; x.fillRect(0,0,w,h); }
+    const mn = Math.min(w,h);
+
+    drawBackground(x, w, h, p===null ? 0 : p);
+
     // 가독성 오버레이
     const og = x.createLinearGradient(0,h*0.55,0,h);
     og.addColorStop(0,"rgba(0,0,0,0)"); og.addColorStop(1,"rgba(0,0,0,0.55)");
     x.fillStyle = og; x.fillRect(0,0,w,h);
 
-    // 비주얼라이저
+    // ---------- 비주얼라이저 ----------
     x.save();
     if(S.viz==="bars" && freq){
       const n=64, bw = w/n*0.62, gap = w/n*0.38;
@@ -648,7 +792,8 @@ function drawFrame(audio, progress){
       x.fillStyle = S.accent;
       x.shadowColor = S.accent; x.shadowBlur = h*0.015;
       for(let i=0;i<n;i++){
-        const bh = Math.max(h*0.006, lv[i]*lv[i]*h*0.34);
+        const v = Math.min(1, lv[i]*S.sens);
+        const bh = Math.max(h*0.006, v*v*h*0.34);
         x.fillRect(i*(bw+gap)+gap/2, h*0.86-bh, bw, bh);
       }
     }
@@ -658,37 +803,153 @@ function drawFrame(audio, progress){
       x.beginPath();
       const step = Math.max(1, Math.floor(wave.length/w));
       for(let i=0, px=0; i<wave.length; i+=step, px++){
-        const y = h*0.72 + (wave[i]-128)/128 * h*0.16;
+        const y = h*0.72 + (wave[i]-128)/128 * h*0.16 * S.sens;
         if(px===0) x.moveTo(0,y); else x.lineTo(px*(w/(wave.length/step)),y);
       }
       x.stroke();
     }
     else if(S.viz==="ring"){
-      // 시그니처: 장단 링 — 저역 펄스로 숨쉬는 원형 스펙트럼
       const cx=w/2, cy=h*0.44;
-      const base = Math.min(w,h)*(0.16 + bass*0.03);
+      const base = mn*(0.16 + bass*0.03);
       const n=96;
       const lv = freq ? bandLevels(freq,n) : new Float32Array(n).fill(0.08);
       x.translate(cx,cy); x.rotate(S.ringAngle);
-      x.strokeStyle = S.accent; x.lineWidth = Math.max(2, Math.min(w,h)*0.006);
-      x.shadowColor = S.accent; x.shadowBlur = Math.min(w,h)*0.02;
+      x.strokeStyle = S.accent; x.lineWidth = Math.max(2, mn*0.006);
+      x.shadowColor = S.accent; x.shadowBlur = mn*0.02;
       x.lineCap = "round";
       for(let i=0;i<n;i++){
         const a = i/n*Math.PI*2;
-        const l = base + lv[i]*lv[i]*Math.min(w,h)*0.20;
+        const v = Math.min(1, lv[i]*S.sens);
+        const l = base + v*v*mn*0.20;
         x.beginPath();
         x.moveTo(Math.cos(a)*base, Math.sin(a)*base);
         x.lineTo(Math.cos(a)*l, Math.sin(a)*l);
         x.stroke();
       }
-      // 중심 고리
       x.beginPath(); x.arc(0,0,base*0.82,0,Math.PI*2);
       x.globalAlpha=.5; x.stroke(); x.globalAlpha=1;
       x.setTransform(1,0,0,1,0,0);
     }
+    else if(S.viz==="burst"){
+      // 비트마다 중앙에서 입자가 터져 흩어짐 + 저역 펄스 코어
+      x.fillStyle = S.accent;
+      x.shadowColor = S.accent; x.shadowBlur = mn*0.02;
+      for(const pt of S.particles){
+        const px = pt.x*w, py = pt.y*h;
+        const r = pt.r*mn*(0.7 + (1-pt.life)*0.9);
+        x.globalAlpha = Math.max(0, pt.life)*0.9;
+        x.beginPath(); x.arc(px, py, r, 0, Math.PI*2); x.fill();
+      }
+      x.globalAlpha = 1;
+      const coreR = mn*(0.03 + bass*0.05 + S.beatPulse*0.03);
+      x.globalAlpha = 0.85;
+      x.beginPath(); x.arc(w/2, h*0.5, coreR, 0, Math.PI*2); x.fill();
+      x.globalAlpha = 0.35;
+      x.lineWidth = Math.max(2, mn*0.004); x.strokeStyle = S.accent;
+      x.beginPath(); x.arc(w/2, h*0.5, coreR*(1.6+S.beatPulse*1.2), 0, Math.PI*2); x.stroke();
+      x.globalAlpha = 1;
+    }
+    else if(S.viz==="aurora"){
+      // 스펙트럼을 부드러운 빛의 띠 3겹으로 — lofi/국악 무드
+      const n=48;
+      x.globalCompositeOperation = "lighter";
+      for(let L=0; L<3; L++){
+        const yBase = h*(0.60 + L*0.09);
+        const amp = h*0.20*(1 - L*0.22);
+        x.beginPath();
+        x.moveTo(0, h);
+        for(let i=0;i<n;i++){
+          const b = S.smoothBands[Math.floor(i*64/n)];
+          const px = i/(n-1)*w;
+          const py = yBase - Math.pow(b,1.4)*amp
+            + Math.sin(i*0.35 + tSec*(0.5+L*0.3))*h*0.012;
+          x.lineTo(px, py);
+        }
+        x.lineTo(w, h); x.closePath();
+        const gr = x.createLinearGradient(0, yBase-amp, 0, h);
+        gr.addColorStop(0, S.accent + "55");
+        gr.addColorStop(1, S.accent + "00");
+        x.fillStyle = gr;
+        x.fill();
+      }
+      x.globalCompositeOperation = "source-over";
+    }
+    else if(S.viz==="lp"){
+      // 회전하는 LP + 커버 라벨 + 둘레 스펙트럼 링
+      S.lpAngle += dt*(1.4 + bass*2.5);
+      const cx=w/2, cy=h*0.42, R=mn*0.26;
+      const n=72;
+      const lv = freq ? bandLevels(freq,n) : new Float32Array(n).fill(0.06);
+      x.save();
+      x.translate(cx,cy); x.rotate(S.ringAngle*0.5);
+      x.strokeStyle = S.accent; x.lineWidth = Math.max(2, mn*0.005);
+      x.shadowColor = S.accent; x.shadowBlur = mn*0.015;
+      x.lineCap = "round";
+      for(let i=0;i<n;i++){
+        const a = i/n*Math.PI*2;
+        const v = Math.min(1, lv[i]*S.sens);
+        const r0 = R*1.10, r1 = r0 + v*v*R*0.45;
+        x.beginPath();
+        x.moveTo(Math.cos(a)*r0, Math.sin(a)*r0);
+        x.lineTo(Math.cos(a)*r1, Math.sin(a)*r1);
+        x.stroke();
+      }
+      x.restore();
+      // 디스크
+      x.save();
+      x.shadowColor="rgba(0,0,0,.5)"; x.shadowBlur=mn*0.02;
+      const dg = x.createRadialGradient(cx,cy,R*0.1,cx,cy,R);
+      dg.addColorStop(0,"#1b1b1f"); dg.addColorStop(1,"#08080a");
+      x.fillStyle=dg;
+      x.beginPath(); x.arc(cx,cy,R,0,Math.PI*2); x.fill();
+      x.shadowBlur=0;
+      x.strokeStyle="rgba(255,255,255,.05)"; x.lineWidth=1;
+      for(let r=R*0.5; r<R*0.96; r+=R*0.045){
+        x.beginPath(); x.arc(cx,cy,r,0,Math.PI*2); x.stroke();
+      }
+      // 라벨: 배경 첫 슬라이드를 커버로 회전
+      const rl = R*0.42;
+      x.translate(cx,cy); x.rotate(S.lpAngle);
+      x.beginPath(); x.arc(0,0,rl,0,Math.PI*2); x.clip();
+      if(S.slides.length){
+        const img = S.slides[0];
+        const d = rl*2;
+        const s = Math.max(d/img.width, d/img.height);
+        x.drawImage(img, -img.width*s/2, -img.height*s/2, img.width*s, img.height*s);
+      }else{
+        x.fillStyle = S.accent; x.fillRect(-rl,-rl,rl*2,rl*2);
+      }
+      x.restore();
+      // 센터 홀
+      x.fillStyle="#0D1015";
+      x.beginPath(); x.arc(cx,cy,R*0.035,0,Math.PI*2); x.fill();
+    }
+    else if(S.viz==="dots"){
+      // 점묘 별자리 — 대역별 점이 빛나고 이웃끼리 이어짐
+      const n=40;
+      const rnd = mulberry32(20250719);   // 프레임마다 동일한 지터 배치
+      const pts=[];
+      for(let i=0;i<n;i++){
+        const b = S.smoothBands[Math.floor(i*64/n)];
+        const px = (0.06 + 0.88*i/(n-1))*w;
+        const py = h*0.62 - Math.pow(b,1.3)*h*0.32 + (rnd()-0.5)*h*0.10;
+        pts.push({px,py,b});
+      }
+      x.strokeStyle = S.accent; x.globalAlpha=.20; x.lineWidth=Math.max(1, mn*0.0015);
+      x.beginPath();
+      for(let i=0;i<n;i++){ if(i===0) x.moveTo(pts[i].px,pts[i].py); else x.lineTo(pts[i].px,pts[i].py); }
+      x.stroke();
+      x.globalAlpha=1;
+      x.fillStyle = S.accent;
+      x.shadowColor = S.accent; x.shadowBlur = mn*0.012;
+      for(const q of pts){
+        const r = mn*0.004*(0.6 + q.b*2.2);
+        x.beginPath(); x.arc(q.px, q.py, r, 0, Math.PI*2); x.fill();
+      }
+    }
     x.restore();
 
-    // 텍스트
+    // ---------- 텍스트 ----------
     if(S.showText){
       const title = $("titleInput").value.trim() || S.fileName.replace(/\.[^.]+$/,"");
       const artist = $("artistInput").value.trim();
@@ -705,29 +966,67 @@ function drawFrame(audio, progress){
         x.shadowBlur=0; x.shadowOffsetY=0;
       }
     }
-    // 진행바
-    if(S.showProg && progress !== undefined && progress !== null){
+    // ---------- 진행바 ----------
+    if(S.showProg && p !== null){
       x.fillStyle="rgba(255,255,255,.18)";
       x.fillRect(0, h-Math.max(3,h*0.006), w, Math.max(3,h*0.006));
       x.fillStyle = S.accent;
-      x.fillRect(0, h-Math.max(3,h*0.006), w*Math.min(1,progress), Math.max(3,h*0.006));
+      x.fillRect(0, h-Math.max(3,h*0.006), w*Math.min(1,p), Math.max(3,h*0.006));
+    }
+    // ---------- 그레인·빛샘 오버레이 ----------
+    if(S.fxOverlay){
+      const lx = w*(0.5 + 0.45*Math.sin(tSec*0.07));
+      const ly = h*(0.25 + 0.15*Math.cos(tSec*0.05));
+      const lr = mn*0.9;
+      const lg2 = x.createRadialGradient(lx,ly,0,lx,ly,lr);
+      lg2.addColorStop(0,"rgba(255,190,120,0.13)");
+      lg2.addColorStop(1,"rgba(255,190,120,0)");
+      x.globalCompositeOperation="screen";
+      x.fillStyle=lg2; x.fillRect(0,0,w,h);
+      x.globalCompositeOperation="source-over";
+      x.globalAlpha=0.06;
+      x.fillStyle = x.createPattern(getGrain(),"repeat");
+      x.fillRect(0,0,w,h);
+      x.globalAlpha=1;
+    }
+    // ---------- 페이드 인/아웃 (영상) ----------
+    if(S.fade && p !== null && S.curDur > 0){
+      const sec = p*S.curDur;
+      let fa = 0;
+      if(sec < 1.2) fa = 1 - sec/1.2;
+      else if(S.curDur - sec < 3) fa = 1 - (S.curDur - sec)/3;
+      if(fa > 0.005){
+        x.fillStyle = `rgba(0,0,0,${Math.min(1,fa).toFixed(3)})`;
+        x.fillRect(0,0,w,h);
+      }
     }
   }
 }
 
 // ---------- 미리듣기 ----------
+function scheduleFade(fadeNode, ctx, t0, dur){
+  // 오디오 페이드: 인 1.2초 / 아웃 3초 — 영상 암전과 동기
+  if(!S.fade){ fadeNode.gain.setValueAtTime(1, t0); return; }
+  fadeNode.gain.setValueAtTime(0.0001, t0);
+  fadeNode.gain.linearRampToValueAtTime(1, t0 + 1.2);
+  fadeNode.gain.setValueAtTime(1, Math.max(t0 + 1.2, t0 + dur - 3));
+  fadeNode.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+}
+
 function makePlayNodes(monitorOn){
   const ctx = getCtx();
   const src = ctx.createBufferSource();
   src.buffer = S.procBuffer || S.rawBuffer;
+  const fade = ctx.createGain();
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.8;
   const gain = ctx.createGain();
   gain.gain.value = monitorOn ? 1 : 0;
-  src.connect(analyser);
+  src.connect(fade);
+  fade.connect(analyser);
   analyser.connect(gain);
   gain.connect(ctx.destination);
-  return {src, analyser, gain};
+  return {src, analyser, gain, fade};
 }
 
 let previewRAF = null;
@@ -744,6 +1043,8 @@ function startPreview(){
   S.playNodes = nodes; S.playing = true;
   const t0 = getCtx().currentTime;
   const dur = nodes.src.buffer.duration;
+  S.curDur = dur;
+  scheduleFade(nodes.fade, getCtx(), t0, dur);
   nodes.src.start();
   nodes.src.onended = stopPreview;
   $("btnPreview").textContent = "■ 정지";
@@ -787,13 +1088,15 @@ async function startRender(){
   rc.width = dims[0]; rc.height = dims[1];
   S.renderCanvas = rc;
 
-  // 오디오 경로: source → analyser → recDest (+모니터)
+  // 오디오 경로: source → fade → analyser → recDest (+모니터)
   const src = ctx.createBufferSource(); src.buffer = S.procBuffer;
+  const fade = ctx.createGain();
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.8;
   const recDest = ctx.createMediaStreamDestination();
   const mon = ctx.createGain(); mon.gain.value = S.monitor ? 1 : 0;
-  src.connect(analyser); analyser.connect(recDest); analyser.connect(mon); mon.connect(ctx.destination);
+  src.connect(fade); fade.connect(analyser);
+  analyser.connect(recDest); analyser.connect(mon); mon.connect(ctx.destination);
 
   const vStream = rc.captureStream(30);
   const stream = new MediaStream([...vStream.getVideoTracks(), ...recDest.stream.getAudioTracks()]);
@@ -807,6 +1110,7 @@ async function startRender(){
   try{ if(navigator.wakeLock) S.wakeLock = await navigator.wakeLock.request("screen"); }catch(e){}
 
   const dur = S.procBuffer.duration;
+  S.curDur = dur;
   $("pTotal").textContent = fmtTime(dur);
   $("progressWrap").style.display = "block";
   $("resultBox").style.display = "none";
@@ -816,6 +1120,7 @@ async function startRender(){
 
   recorder.start(1000);
   const t0 = ctx.currentTime;
+  scheduleFade(fade, ctx, t0, dur);
   src.start();
   const nodes = {analyser};
   src.onended = ()=> setTimeout(()=>{ if(S.rendering) recorder.stop(); }, 350);
@@ -949,13 +1254,16 @@ function init(){
   $("btnReart").addEventListener("click", ()=>refreshArt(true));
   $("btnPhoto").addEventListener("click", ()=>$("photoInput").click());
   $("photoInput").addEventListener("change", async e=>{
-    const f = e.target.files[0]; if(!f) return;
+    const files = [...e.target.files]; if(!files.length) return;
     try{
-      S.bgImage = await createImageBitmap(f);
-      drawFrame(null); toast("✓ 사진 배경 적용됨");
+      const imgs = [];
+      for(const f of files) imgs.push(await createImageBitmap(f));
+      setSlides(imgs);
+      toast(imgs.length>1 ? `✓ 사진 ${imgs.length}장 — 슬라이드쇼 적용` : "✓ 사진 배경 적용됨");
     }catch(err){ toast("사진을 열 수 없습니다"); }
   });
-  $("btnAiGen").addEventListener("click", loadAiImage);
+  $("btnAiGen").addEventListener("click", ()=>loadAiImage(false));
+  $("btnAiAdd").addEventListener("click", ()=>loadAiImage(true));
 
   bindChips("ratioChips", v=>{ S.ratio=v; setRatioCanvas(); });
   bindChips("vizChips", v=>{ S.viz=v; drawFrame(null); });
@@ -975,6 +1283,15 @@ function init(){
   toggle("chipText","showText");
   toggle("chipProg","showProg");
   toggle("chipMonitor","monitor");
+  toggle("chipKb","kb");
+  toggle("chipPump","pump");
+  toggle("chipMood","moodShift");
+  toggle("chipFade","fade");
+  toggle("chipFx","fxOverlay");
+  $("sensRange").addEventListener("input", e=>{
+    S.sens = parseFloat(e.target.value);
+    $("sensLabel").textContent = S.sens.toFixed(1) + "×";
+  });
 
   $("qBtn").addEventListener("click", ()=>{
     S.quality = S.quality===1080 ? 720 : 1080;
