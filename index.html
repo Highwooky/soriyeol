@@ -376,7 +376,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p class="notice" id="renderNote">렌더 중 다른 앱으로 이동하거나 화면을 잠그면 작업이 멈춥니다.</p>
 </section>
 
-<footer>LUMATONE v2.8 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v2.9 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -4119,6 +4119,44 @@ function makeAsc(sampleRate, channels){
   return new Uint8Array([ (2<<3) | (idx>>1), ((idx&1)<<7) | (channels<<3) ]);
 }
 
+// 사파리 AudioEncoder가 description으로 ESDS 전체를 주는 경우가 있음
+// (0x03 ES_Descriptor … 0x04 DecoderConfig … 0x05 DecoderSpecificInfo=ASC).
+// mp4-muxer는 raw ASC만 받아야 하므로 0x05 태그 내부의 ASC 바이트만 추출한다.
+function extractAsc(desc){
+  const b = desc instanceof Uint8Array ? desc : new Uint8Array(desc.buffer || desc);
+  // 이미 순수 ASC로 보이면(첫 5비트=objectType 1~4 등, 길이 ≤ 8) 그대로 사용
+  if(b.length <= 8 && b[0] !== 0x03 && b[0] !== 0x04 && b[0] !== 0x05) return b;
+  let i = 0;
+  const readLen = () => {              // 0x80 확장 길이 바이트(최대 4개) 파싱
+    let len = 0, cnt = 0, byte;
+    do { byte = b[i++]; len = (len << 7) | (byte & 0x7F); } while((byte & 0x80) && ++cnt < 4);
+    return len;
+  };
+  const findTag = (tag, end) => {      // 현재 위치부터 end까지 특정 태그 탐색
+    while(i < end){
+      const t = b[i++];
+      const len = readLen();
+      if(t === tag) return len;
+      if(t === 0x03) { i += 2; continue; }   // ES_Descriptor: ES_ID(2) + flags(1) 중 일부 스킵 보정
+      i += (t === 0x04) ? 13 : len;          // DecoderConfig 고정 헤더(13B) 건너뛰고 내부 탐색
+    }
+    return -1;
+  };
+  try{
+    if(b[0] === 0x03){                 // ES_Descriptor
+      i = 1; readLen(); i += 3;        // ES_ID(2) + flags(1)
+    }
+    // DecoderConfigDescriptor(0x04) 진입 → 그 안의 DecoderSpecificInfo(0x05)
+    while(i < b.length){
+      const t = b[i++]; const len = readLen();
+      if(t === 0x04){ i += 13; continue; }     // objectType+flags+bufSize+bitrates = 13B
+      if(t === 0x05){ return b.subarray(i, i + len); }   // ← ASC
+      i += len;
+    }
+  }catch(e){ /* 파싱 실패 → 폴백 */ }
+  return null;
+}
+
 // 결과물이 이 기기에서 실제로 재생 가능한지 즉석 검증 (4초 타임아웃)
 function verifyPlayable(blob){
   return new Promise(res=>{
@@ -4269,12 +4307,24 @@ async function fastRender(){
         DG.aChunks++; DG.aBytes += data.length;
         if(audioFirst){
           audioFirst = false;
-          let desc = m && m.decoderConfig && m.decoderConfig.description;
-          DG.descFrom = desc ? "encoder" : "synthesized";
-          if(!desc) desc = makeAsc(projSR, 2);          // ASC 누락 시 규격대로 생성
+          const raw = m && m.decoderConfig && m.decoderConfig.description;
+          let desc = null, from = "synthesized";
+          if(raw){
+            const asc = extractAsc(raw);   // ESDS 래퍼면 내부 ASC만 추출
+            // 유효한 ASC인지 확인: 2~5바이트, objectType(상위 5비트)이 1~5(AAC 계열)
+            if(asc && asc.length >= 2 && asc.length <= 5){
+              const objType = asc[0] >> 3;
+              if(objType >= 1 && objType <= 5){ desc = asc; from = "encoder-asc"; }
+            }
+          }
+          if(!desc) desc = makeAsc(projSR, 2);   // 추출 실패 시 규격대로 직접 생성
+          DG.descFrom = from;
           try{
-            const dv = desc instanceof Uint8Array ? desc : new Uint8Array(desc.buffer || desc);
-            DG.descHex = [...dv.slice(0,8)].map(b=>b.toString(16).padStart(2,"0")).join(" ");
+            DG.descHex = [...desc.slice(0,8)].map(b=>b.toString(16).padStart(2,"0")).join(" ");
+            if(raw){
+              const rv = raw instanceof Uint8Array ? raw : new Uint8Array(raw.buffer || raw);
+              DG.rawHex = [...rv.slice(0,12)].map(b=>b.toString(16).padStart(2,"0")).join(" ");
+            }
           }catch(e){ DG.descHex = "?"; }
           muxer.addAudioChunkRaw(data, "key", c.timestamp, c.duration || AAC_DUR,
             {decoderConfig:{codec:"mp4a.40.2", sampleRate:projSR, numberOfChannels:2, description:desc}});
@@ -4671,7 +4721,7 @@ function init(){
   $("btnDesc").addEventListener("click", copyDescription);
   $("btnDiag").addEventListener("click", async ()=>{
     const info = {
-      app: "LUMATONE v2.8",
+      app: "LUMATONE v2.9",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
