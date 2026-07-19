@@ -100,8 +100,9 @@ input[type=text]:focus{border-color:var(--accent)}
 .notice b{color:var(--gold)}
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 20px);transform:translateX(-50%) translateY(80px);
   background:var(--surface2);border:1px solid var(--line);color:var(--text);padding:12px 18px;border-radius:14px;
-  font-size:.85rem;opacity:0;transition:.3s;z-index:99;max-width:90vw;text-align:center}
+  font-size:.85rem;opacity:0;transition:.3s;z-index:99;max-width:90vw;text-align:center;cursor:pointer}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+#previewCanvas.dragmode{touch-action:none;outline:1.5px dashed var(--accent);outline-offset:-1.5px}
 footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-height:1.7}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -134,6 +135,8 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   </div>
   <div class="label">타깃 라우드니스: <b id="lufsLabel" style="color:var(--text)">-14.0 LUFS</b></div>
   <input type="range" id="lufsRange" min="-18" max="-9" step="0.5" value="-14">
+  <div class="label">마스터링 강도: <b id="amtLabel" style="color:var(--text)">100%</b></div>
+  <input type="range" id="amtRange" min="0" max="2" step="0.1" value="1">
   <div class="meter">
     <div class="cell"><div class="v" id="mLufsIn">–</div><div class="k">원본 LUFS</div></div>
     <div class="cell"><div class="v" id="mLufsOut">–</div><div class="k">결과 LUFS</div></div>
@@ -207,6 +210,15 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
     <div class="sw" data-v="#5B8CFF" style="background:#5B8CFF"></div>
     <div class="sw" data-v="#F2F2F2" style="background:#F2F2F2"></div>
   </div>
+  <div class="label">제목 폰트 (기본 외엔 최초 1회 인터넷 필요)</div>
+  <div class="chips" id="fontChips">
+    <button class="chip on" data-v="gothic">고딕</button>
+    <button class="chip" data-v="serif">명조</button>
+    <button class="chip" data-v="black">블랙</button>
+    <button class="chip" data-v="dohyeon">도현</button>
+    <button class="chip" data-v="brush">붓글씨</button>
+    <button class="chip" data-v="pen">손글씨</button>
+  </div>
   <div class="label">곡 제목</div>
   <input type="text" id="titleInput" placeholder="곡 제목">
   <div class="label">아티스트 / 부제</div>
@@ -221,7 +233,21 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <div class="chips">
     <button class="chip on" id="chipFade">페이드 인/아웃</button>
     <button class="chip" id="chipFx">그레인·빛샘</button>
+    <button class="chip" id="chipDust">빛입자</button>
+    <button class="chip" id="chipCine">시네마 바</button>
+    <button class="chip" id="chipGlow">글로우+</button>
   </div>
+  <div class="label">배치 조정 — 모드 선택 후 미리보기 화면을 드래그</div>
+  <div class="chips" id="dragChips">
+    <button class="chip on" data-v="off">끔</button>
+    <button class="chip" data-v="viz">비주얼라이저 이동</button>
+    <button class="chip" data-v="text">제목 이동</button>
+  </div>
+  <div class="label">비주얼라이저 크기: <b id="vscaleLabel" style="color:var(--text)">100%</b></div>
+  <input type="range" id="vscaleRange" min="0.4" max="1.8" step="0.05" value="1">
+  <div class="label">제목 크기: <b id="tscaleLabel" style="color:var(--text)">100%</b></div>
+  <input type="range" id="tscaleRange" min="0.5" max="2" step="0.05" value="1">
+  <div style="margin-top:10px"><button class="btn small" id="btnResetPos">배치 초기화</button></div>
   <div class="label">비주얼라이저 감도: <b id="sensLabel" style="color:var(--text)">1.0×</b></div>
   <input type="range" id="sensRange" min="0.5" max="2" step="0.1" value="1">
   <div class="label">기타</div>
@@ -238,6 +264,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <div class="previewbox"><canvas id="previewCanvas" width="960" height="540"></canvas></div>
   <div class="prevctl">
     <button class="btn" id="btnPreview" disabled>▶ 미리듣기</button>
+    <button class="btn" id="btnAB" style="display:none">A/B: 마스터</button>
     <div style="margin-left:auto"></div>
     <button class="btn small" id="qBtn" data-v="1080">화질 1080p</button>
   </div>
@@ -255,7 +282,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p class="notice">렌더는 곡 길이만큼 실시간으로 진행됩니다 (3분 곡 = 약 3분). 진행 중 다른 앱으로 이동하거나 화면을 잠그면 녹화가 멈춥니다.</p>
 </section>
 
-<footer>소리결 v1.1 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)</footer>
+<footer>소리결 v1.3 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)</footer>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -276,6 +303,10 @@ const S = {
   fileName: "",
   preset: "clean",
   targetLUFS: -14,
+  amount: 1.0,             // 마스터링 강도 (0~2)
+  font: "gothic",
+  abOriginal: false,       // A/B 비교: true면 원본(음량 매칭) 청취
+  rawMatched: null,        // 원본을 타깃 LUFS로만 맞춘 버퍼 (A/B용)
   lufsIn: null, lufsOut: null, peakOut: null,
   bgMode: "art",           // art | photo | ai
   mood: "dawn",
@@ -287,6 +318,11 @@ const S = {
   accent: "#3ECFB2",
   showText: true, showProg: true, monitor: true,
   kb: true, pump: true, moodShift: false, fade: true, fxOverlay: false,
+  dust: false, cine: false, glowBoost: false,
+  dragTarget: "off",       // off | viz | text — 미리보기 드래그 대상
+  vizPos: {x:0.5, y:0.44}, vizScale: 1.0,
+  textPos: {x:0.5, y:0.90}, textScale: 1.0,
+  dustP: [],               // 앰비언트 빛입자 (지속형)
   sens: 1.0,
   curDur: 0,
   bassAvg: 0.05, beatPulse: 0, beatCool: 0,
@@ -323,6 +359,39 @@ function mulberry32(a){
     t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
     return ((t ^ t >>> 14) >>> 0) / 4294967296;
   };
+}
+
+// ---------- 제목 폰트 (선택 시 최초 1회만 로드) ----------
+const FONTS = [
+  {id:"gothic",  name:"고딕",   gf:null,                          family:'-apple-system,"Apple SD Gothic Neo",sans-serif', w:800, mul:1.00},
+  {id:"serif",   name:"명조",   gf:"Noto+Serif+KR:wght@700",      family:'"Noto Serif KR",serif',        w:700, mul:1.00},
+  {id:"black",   name:"블랙",   gf:"Black+Han+Sans",              family:'"Black Han Sans",sans-serif',  w:400, mul:1.05},
+  {id:"dohyeon", name:"도현",   gf:"Do+Hyeon",                    family:'"Do Hyeon",sans-serif',        w:400, mul:1.05},
+  {id:"brush",   name:"붓글씨", gf:"Nanum+Brush+Script",          family:'"Nanum Brush Script",cursive', w:400, mul:1.50},
+  {id:"pen",     name:"손글씨", gf:"Nanum+Pen+Script",            family:'"Nanum Pen Script",cursive',   w:400, mul:1.45},
+];
+const loadedFonts = new Set(["gothic"]);
+async function selectFont(id){
+  const f = FONTS.find(v=>v.id===id) || FONTS[0];
+  if(f.gf && !loadedFonts.has(id)){
+    try{
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "https://fonts.googleapis.com/css2?family=" + f.gf + "&display=swap";
+      document.head.appendChild(link);
+      // 캔버스는 폰트가 실제 로드된 후에만 그릴 수 있음 → 명시적으로 대기
+      await document.fonts.load(`${f.w} 40px ${f.family.split(",")[0]}`);
+      loadedFonts.add(id);
+    }catch(err){
+      console.warn("[소리결] 폰트 로드 실패:", err);
+      toast("폰트를 불러오지 못했습니다 (인터넷 확인) — 기본 고딕 사용", 3000);
+      S.font = "gothic";
+      drawFrame(null);
+      return;
+    }
+  }
+  S.font = id;
+  drawFrame(null);
 }
 
 // ============================================================
@@ -419,33 +488,72 @@ function limiter(channels, ceiling){
   }
 }
 
-// 마스터링 프리셋 → OfflineAudioContext 그래프
-function buildChain(off, src, preset){
+// tanh 소프트 새추레이션 커브 (dry/wet 믹스) — mix=0이면 완전 선형 (강도 0 보장)
+function satCurve(k, mix){
+  const N = 2048, c = new Float32Array(N);
+  const norm = Math.tanh(k);
+  for(let i=0;i<N;i++){
+    const v = i/(N-1)*2 - 1;
+    c[i] = v*(1-mix) + (Math.tanh(k*v)/norm)*mix;
+  }
+  return c;
+}
+
+// 마스터링 프리셋 → OfflineAudioContext 그래프 (amount: 0~2 강도 스케일)
+function buildChain(off, src, preset, amount){
   let node = src;
   const eq = (type, f, gain, q) => {
     const n = off.createBiquadFilter();
     n.type = type; n.frequency.value = f;
-    if(gain !== undefined) n.gain.value = gain;
+    if(gain !== undefined) n.gain.value = gain * amount;   // EQ량은 강도에 비례
     if(q !== undefined) n.Q.value = q;
     node.connect(n); node = n;
   };
   const comp = (th, ratio, atk, rel) => {
     const c = off.createDynamicsCompressor();
-    c.threshold.value = th; c.ratio.value = ratio; c.knee.value = 6;
+    // 강도↑ = threshold↓(더 깊게 걸림), 강도 0이면 사실상 바이패스
+    c.threshold.value = Math.max(-40, Math.min(-6, th + (1-amount)*8));
+    c.ratio.value = ratio; c.knee.value = 6;
     c.attack.value = atk; c.release.value = rel;
     node.connect(c); node = c;
+  };
+  const sat = (drive) => {
+    const mix = Math.min(1, drive * amount);   // 강도 0 → 믹스 0 = 바이패스
+    if(mix <= 0.02) return;
+    const ws = off.createWaveShaper();
+    ws.curve = satCurve(3.0, mix);
+    ws.oversample = "4x";   // 앨리어싱 방지
+    node.connect(ws); node = ws;
   };
   eq("highpass", 28, undefined, 0.71);          // 초저역 정리 (모든 프리셋 공통)
   if(preset === "clean"){ comp(-18, 2, 0.010, 0.25); }
   else if(preset === "punch"){
     eq("lowshelf", 90, 1.5); eq("peaking", 300, -1.0, 1.0); eq("highshelf", 8000, 1.5);
+    sat(0.6);
     comp(-20, 3, 0.005, 0.15);
   }
   else if(preset === "warm"){
     eq("lowshelf", 120, 2.0); eq("highshelf", 10000, -1.0);
+    sat(1.0);
     comp(-16, 2, 0.015, 0.30);
   }
   node.connect(off.destination);
+}
+
+// 버퍼를 타깃 LUFS로 노멀라이즈 + 리미팅한 새 버퍼 반환
+function normalizeTo(buffer, targetLUFS){
+  const lufs = measureLUFS(buffer);
+  const gain = Math.pow(10, (targetLUFS - lufs)/20);
+  const out = new AudioBuffer({numberOfChannels: buffer.numberOfChannels,
+    length: buffer.length, sampleRate: buffer.sampleRate});
+  const chans = [];
+  for(let c=0;c<buffer.numberOfChannels;c++){
+    const s = buffer.getChannelData(c), d = out.getChannelData(c);
+    for(let i=0;i<s.length;i++) d[i] = s[i]*gain;
+    chans.push(d);
+  }
+  limiter(chans, Math.pow(10, -1/20));   // 실링 -1 dBFS
+  return out;
 }
 
 async function processAudio(){
@@ -458,27 +566,24 @@ async function processAudio(){
     if(S.preset !== "off"){
       const off = new OfflineAudioContext(buf.numberOfChannels, buf.length, buf.sampleRate);
       const src = off.createBufferSource(); src.buffer = buf;
-      buildChain(off, src, S.preset);
+      buildChain(off, src, S.preset, S.amount);
       src.start();
       rendered = await off.startRendering();
     }
-    // 노멀라이즈: 측정 → 게인 → 리미터
-    const lufs = measureLUFS(rendered);
-    const gainDB = S.targetLUFS - lufs;
-    const gain = Math.pow(10, gainDB/20);
-    const out = new AudioBuffer({numberOfChannels: rendered.numberOfChannels,
-      length: rendered.length, sampleRate: rendered.sampleRate});
-    const chans = [];
-    for(let c=0;c<rendered.numberOfChannels;c++){
-      const s = rendered.getChannelData(c), d = out.getChannelData(c);
-      for(let i=0;i<s.length;i++) d[i] = s[i]*gain;
-      chans.push(d);
-    }
-    limiter(chans, Math.pow(10, -1/20));   // 실링 -1 dBFS
+    // 노멀라이즈 (마스터) + A/B 비교용 원본 매칭 버퍼 (같은 음량에서 순수 음색 차이만 비교)
+    const out = normalizeTo(rendered, S.targetLUFS);
     S.procBuffer = out;
+    S.rawMatched = (S.preset !== "off") ? normalizeTo(buf, S.targetLUFS) : out;
+    S.abOriginal = false;
+    $("btnAB").style.display = (S.preset !== "off") ? "inline-flex" : "none";
+    $("btnAB").textContent = "A/B: 마스터";
+    $("btnAB").classList.remove("hot");
     S.lufsOut = measureLUFS(out);
     let pk = 0;
-    for(const ch of chans) for(let i=0;i<ch.length;i++){ const a=Math.abs(ch[i]); if(a>pk) pk=a; }
+    for(let c=0;c<out.numberOfChannels;c++){
+      const ch = out.getChannelData(c);
+      for(let i=0;i<ch.length;i++){ const a=Math.abs(ch[i]); if(a>pk) pk=a; }
+    }
     S.peakOut = db(pk);
     $("mLufsOut").textContent = S.lufsOut.toFixed(1);
     $("mLufsOut").className = "v ok";
@@ -605,23 +710,43 @@ async function loadAiImage(append){
   if(!prompt){ toast("프롬프트를 입력하세요"); return; }
   const btn = append ? $("btnAiAdd") : $("btnAiGen");
   const orig = btn.textContent;
+  const info = $("slideInfo");
   btn.disabled = true; btn.textContent = "생성 중…";
+  const [w,h] = S.ratio==="916" ? [1080,1920] : S.ratio==="11" ? [1440,1440] : [1920,1080];
+  const MAX_TRY = 2, TIMEOUT_MS = 75000;   // 이미지 생성은 30초~1분 걸릴 수 있음
+  let lastErr = null;
   try{
-    const [w,h] = S.ratio==="916" ? [1080,1920] : S.ratio==="11" ? [1440,1440] : [1920,1080];
-    const url = "https://image.pollinations.ai/prompt/" + encodeURIComponent(prompt)
-      + `?width=${w}&height=${h}&nologo=true&seed=${Math.floor(Math.random()*99999)}`;
-    const res = await fetch(url);
-    if(!res.ok) throw new Error("서버 응답 " + res.status);
-    const blob = await res.blob();
-    const img = await createImageBitmap(blob);
-    if(append && S.slides.length) setSlides([...S.slides, img]);
-    else setSlides([img]);
-    toast(append ? `✓ 슬라이드 추가 (${S.slides.length}장)` : "✓ AI 배경 적용됨");
-  }catch(err){
-    console.error("[소리결] AI 이미지 실패:", err);
-    toast("이미지 생성 실패 — 잠시 후 재시도하거나 생성 아트를 사용하세요", 3500);
+    for(let attempt=1; attempt<=MAX_TRY; attempt++){
+      info.textContent = `이미지 생성 중… (시도 ${attempt}/${MAX_TRY}, 최대 1분 소요)`;
+      const ac = new AbortController();
+      const timer = setTimeout(()=>ac.abort(), TIMEOUT_MS);
+      try{
+        const url = "https://image.pollinations.ai/prompt/" + encodeURIComponent(prompt)
+          + `?width=${w}&height=${h}&nologo=true&model=flux&seed=${Math.floor(Math.random()*99999)}`;
+        const res = await fetch(url, {signal: ac.signal});
+        clearTimeout(timer);
+        if(!res.ok) throw new Error("서버 응답 " + res.status);
+        const blob = await res.blob();
+        if(!blob.type.startsWith("image/")) throw new Error("이미지가 아닌 응답");
+        const img = await createImageBitmap(blob);
+        if(append && S.slides.length) setSlides([...S.slides, img]);
+        else setSlides([img]);
+        toast(append ? `✓ 슬라이드 추가 (${S.slides.length}장)` : "✓ AI 배경 적용됨");
+        return;
+      }catch(err){
+        clearTimeout(timer);
+        lastErr = err;
+        console.warn(`[소리결] AI 이미지 시도 ${attempt} 실패:`, err.message);
+      }
+    }
+    // 전 시도 실패
+    console.error("[소리결] AI 이미지 최종 실패:", lastErr);
+    info.textContent = "생성 실패 — 네트워크 확인 후 재시도하거나 생성 아트를 사용하세요";
+    toast("이미지 생성 실패 (탭해서 닫기)", 2500);
   }finally{
     btn.disabled = false; btn.textContent = orig;
+    if(S.slides.length && info.textContent.startsWith("이미지 생성 중"))
+      info.textContent = "";
   }
 }
 
@@ -668,8 +793,26 @@ function spawnBurst(strength){
   for(let i=0; i<n && S.particles.length<260; i++){
     const a = Math.random()*Math.PI*2;
     const sp = 0.12 + Math.random()*0.4*(0.6+strength);
-    S.particles.push({x:0.5, y:0.5, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp*0.7,
+    S.particles.push({x:S.vizPos.x, y:S.vizPos.y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp*0.7,
       life:1, max:0.9+Math.random()*0.6, r:0.004+Math.random()*0.007});
+  }
+}
+// 앰비언트 빛입자 — 화면을 천천히 떠다니는 지속형 파티클 (프리미엄 무드)
+function stepDust(dt, tSec){
+  if(!S.dust){ S.dustP.length = 0; return; }
+  if(!S.dustP.length){
+    const rnd = mulberry32(S.artSeed || 7);
+    for(let i=0;i<44;i++){
+      S.dustP.push({x:rnd(), y:rnd(), vy:-(0.006+rnd()*0.018), ph:rnd()*Math.PI*2,
+        sw:0.004+rnd()*0.012, r:0.0012+rnd()*0.0035, tw:0.5+rnd()*2});
+    }
+  }
+  for(const d of S.dustP){
+    d.y += d.vy*dt;
+    d.x += Math.sin(tSec*0.4 + d.ph)*d.sw*dt;   // 좌우로 살랑임
+    if(d.y < -0.03){ d.y = 1.03; d.x = Math.random(); }
+    if(d.x < -0.02) d.x = 1.02;
+    if(d.x >  1.02) d.x = -0.02;
   }
 }
 function stepParticles(dt){
@@ -758,6 +901,7 @@ function drawFrame(audio, progress){
   }
   updateBeat(bass, dt);
   stepParticles(dt);
+  stepDust(dt, tSec);
   S.ringAngle += 0.004 + bass*0.02;
 
   // 스무딩된 밴드 (오로라/별자리용 — 출렁임을 부드럽게)
@@ -776,6 +920,10 @@ function drawFrame(audio, progress){
     const c = t.canvas, x = c.getContext("2d");
     const w = c.width, h = c.height;
     const mn = Math.min(w,h);
+    // 배치 파라미터: VS=크기 배율, dy=기본 위치 대비 세로 오프셋, GB=글로우 부스트
+    const VS = S.vizScale;
+    const dy = (S.vizPos.y - 0.44) * h;
+    const GB = S.glowBoost ? 2.2 : 1;
 
     drawBackground(x, w, h, p===null ? 0 : p);
 
@@ -789,38 +937,40 @@ function drawFrame(audio, progress){
     if(S.viz==="bars" && freq){
       const n=64, bw = w/n*0.62, gap = w/n*0.38;
       const lv = bandLevels(freq, n);
+      const yBase = Math.min(h*0.97, h*0.86 + dy);
       x.fillStyle = S.accent;
-      x.shadowColor = S.accent; x.shadowBlur = h*0.015;
+      x.shadowColor = S.accent; x.shadowBlur = h*0.015*GB;
       for(let i=0;i<n;i++){
         const v = Math.min(1, lv[i]*S.sens);
-        const bh = Math.max(h*0.006, v*v*h*0.34);
-        x.fillRect(i*(bw+gap)+gap/2, h*0.86-bh, bw, bh);
+        const bh = Math.max(h*0.006, v*v*h*0.34*VS);
+        x.fillRect(i*(bw+gap)+gap/2, yBase-bh, bw, bh);
       }
     }
     else if(S.viz==="wave" && wave){
       x.strokeStyle = S.accent; x.lineWidth = Math.max(2, h*0.004);
-      x.shadowColor = S.accent; x.shadowBlur = h*0.012;
+      x.shadowColor = S.accent; x.shadowBlur = h*0.012*GB;
       x.beginPath();
       const step = Math.max(1, Math.floor(wave.length/w));
+      const yMid = h*0.72 + dy;
       for(let i=0, px=0; i<wave.length; i+=step, px++){
-        const y = h*0.72 + (wave[i]-128)/128 * h*0.16 * S.sens;
+        const y = yMid + (wave[i]-128)/128 * h*0.16 * S.sens * VS;
         if(px===0) x.moveTo(0,y); else x.lineTo(px*(w/(wave.length/step)),y);
       }
       x.stroke();
     }
     else if(S.viz==="ring"){
-      const cx=w/2, cy=h*0.44;
-      const base = mn*(0.16 + bass*0.03);
+      const cx=w*S.vizPos.x, cy=h*S.vizPos.y;
+      const base = mn*(0.16 + bass*0.03)*VS;
       const n=96;
       const lv = freq ? bandLevels(freq,n) : new Float32Array(n).fill(0.08);
       x.translate(cx,cy); x.rotate(S.ringAngle);
-      x.strokeStyle = S.accent; x.lineWidth = Math.max(2, mn*0.006);
-      x.shadowColor = S.accent; x.shadowBlur = mn*0.02;
+      x.strokeStyle = S.accent; x.lineWidth = Math.max(2, mn*0.006*VS);
+      x.shadowColor = S.accent; x.shadowBlur = mn*0.02*GB;
       x.lineCap = "round";
       for(let i=0;i<n;i++){
         const a = i/n*Math.PI*2;
         const v = Math.min(1, lv[i]*S.sens);
-        const l = base + v*v*mn*0.20;
+        const l = base + v*v*mn*0.20*VS;
         x.beginPath();
         x.moveTo(Math.cos(a)*base, Math.sin(a)*base);
         x.lineTo(Math.cos(a)*l, Math.sin(a)*l);
@@ -831,22 +981,23 @@ function drawFrame(audio, progress){
       x.setTransform(1,0,0,1,0,0);
     }
     else if(S.viz==="burst"){
-      // 비트마다 중앙에서 입자가 터져 흩어짐 + 저역 펄스 코어
+      // 비트마다 지정 위치에서 입자가 터져 흩어짐 + 저역 펄스 코어
+      const bx = w*S.vizPos.x, by = h*S.vizPos.y;
       x.fillStyle = S.accent;
-      x.shadowColor = S.accent; x.shadowBlur = mn*0.02;
+      x.shadowColor = S.accent; x.shadowBlur = mn*0.02*GB;
       for(const pt of S.particles){
         const px = pt.x*w, py = pt.y*h;
-        const r = pt.r*mn*(0.7 + (1-pt.life)*0.9);
+        const r = pt.r*mn*(0.7 + (1-pt.life)*0.9)*VS;
         x.globalAlpha = Math.max(0, pt.life)*0.9;
         x.beginPath(); x.arc(px, py, r, 0, Math.PI*2); x.fill();
       }
       x.globalAlpha = 1;
-      const coreR = mn*(0.03 + bass*0.05 + S.beatPulse*0.03);
+      const coreR = mn*(0.03 + bass*0.05 + S.beatPulse*0.03)*VS;
       x.globalAlpha = 0.85;
-      x.beginPath(); x.arc(w/2, h*0.5, coreR, 0, Math.PI*2); x.fill();
+      x.beginPath(); x.arc(bx, by, coreR, 0, Math.PI*2); x.fill();
       x.globalAlpha = 0.35;
       x.lineWidth = Math.max(2, mn*0.004); x.strokeStyle = S.accent;
-      x.beginPath(); x.arc(w/2, h*0.5, coreR*(1.6+S.beatPulse*1.2), 0, Math.PI*2); x.stroke();
+      x.beginPath(); x.arc(bx, by, coreR*(1.6+S.beatPulse*1.2), 0, Math.PI*2); x.stroke();
       x.globalAlpha = 1;
     }
     else if(S.viz==="aurora"){
@@ -854,8 +1005,8 @@ function drawFrame(audio, progress){
       const n=48;
       x.globalCompositeOperation = "lighter";
       for(let L=0; L<3; L++){
-        const yBase = h*(0.60 + L*0.09);
-        const amp = h*0.20*(1 - L*0.22);
+        const yBase = h*(0.60 + L*0.09) + dy;
+        const amp = h*0.20*(1 - L*0.22)*VS;
         x.beginPath();
         x.moveTo(0, h);
         for(let i=0;i<n;i++){
@@ -877,7 +1028,7 @@ function drawFrame(audio, progress){
     else if(S.viz==="lp"){
       // 회전하는 LP + 커버 라벨 + 둘레 스펙트럼 링
       S.lpAngle += dt*(1.4 + bass*2.5);
-      const cx=w/2, cy=h*0.42, R=mn*0.26;
+      const cx=w*S.vizPos.x, cy=h*S.vizPos.y, R=mn*0.26*VS;
       const n=72;
       const lv = freq ? bandLevels(freq,n) : new Float32Array(n).fill(0.06);
       x.save();
@@ -932,7 +1083,7 @@ function drawFrame(audio, progress){
       for(let i=0;i<n;i++){
         const b = S.smoothBands[Math.floor(i*64/n)];
         const px = (0.06 + 0.88*i/(n-1))*w;
-        const py = h*0.62 - Math.pow(b,1.3)*h*0.32 + (rnd()-0.5)*h*0.10;
+        const py = h*0.62 + dy - Math.pow(b,1.3)*h*0.32*VS + (rnd()-0.5)*h*0.10*VS;
         pts.push({px,py,b});
       }
       x.strokeStyle = S.accent; x.globalAlpha=.20; x.lineWidth=Math.max(1, mn*0.0015);
@@ -941,9 +1092,9 @@ function drawFrame(audio, progress){
       x.stroke();
       x.globalAlpha=1;
       x.fillStyle = S.accent;
-      x.shadowColor = S.accent; x.shadowBlur = mn*0.012;
+      x.shadowColor = S.accent; x.shadowBlur = mn*0.012*GB;
       for(const q of pts){
-        const r = mn*0.004*(0.6 + q.b*2.2);
+        const r = mn*0.004*(0.6 + q.b*2.2)*VS;
         x.beginPath(); x.arc(q.px, q.py, r, 0, Math.PI*2); x.fill();
       }
     }
@@ -954,14 +1105,17 @@ function drawFrame(audio, progress){
       const title = $("titleInput").value.trim() || S.fileName.replace(/\.[^.]+$/,"");
       const artist = $("artistInput").value.trim();
       if(title){
+        const F = FONTS.find(f=>f.id===S.font) || FONTS[0];
+        const TS = S.textScale;
+        const tx = w*S.textPos.x, ty = h*S.textPos.y;
         x.textAlign="center"; x.fillStyle="#fff";
         x.shadowColor="rgba(0,0,0,.6)"; x.shadowBlur=h*0.01; x.shadowOffsetY=h*0.003;
-        x.font = `800 ${Math.round(h*0.055)}px -apple-system,"Apple SD Gothic Neo",sans-serif`;
-        x.fillText(title, w/2, h*0.90);
+        x.font = `${F.w} ${Math.round(h*0.055*F.mul*TS)}px ${F.family}`;
+        x.fillText(title, tx, ty);
         if(artist){
-          x.font = `500 ${Math.round(h*0.028)}px -apple-system,"Apple SD Gothic Neo",sans-serif`;
+          x.font = `${Math.min(F.w,500)} ${Math.round(h*0.028*Math.min(F.mul,1.2)*TS)}px ${F.family}`;
           x.fillStyle="rgba(255,255,255,.75)";
-          x.fillText(artist, w/2, h*0.945);
+          x.fillText(artist, tx, Math.min(h*0.985, ty + h*0.048*TS));
         }
         x.shadowBlur=0; x.shadowOffsetY=0;
       }
@@ -988,6 +1142,26 @@ function drawFrame(audio, progress){
       x.fillStyle = x.createPattern(getGrain(),"repeat");
       x.fillRect(0,0,w,h);
       x.globalAlpha=1;
+    }
+    // ---------- 빛입자 (앰비언트) ----------
+    if(S.dust && S.dustP.length){
+      x.save();
+      x.fillStyle = "#fff";
+      x.shadowColor = S.accent; x.shadowBlur = mn*0.008;
+      for(const d of S.dustP){
+        const tw = 0.35 + 0.35*Math.sin(tSec*d.tw + d.ph);   // 반짝임
+        x.globalAlpha = tw;
+        x.beginPath(); x.arc(d.x*w, d.y*h, d.r*mn, 0, Math.PI*2); x.fill();
+      }
+      x.restore();
+      x.globalAlpha = 1;
+    }
+    // ---------- 시네마 바 (2.35:1 느낌의 레터박스) ----------
+    if(S.cine){
+      const bar = h*0.095;
+      x.fillStyle = "#000";
+      x.fillRect(0, 0, w, bar);
+      x.fillRect(0, h-bar, w, bar);
     }
     // ---------- 페이드 인/아웃 (영상) ----------
     if(S.fade && p !== null && S.curDur > 0){
@@ -1017,21 +1191,38 @@ function makePlayNodes(monitorOn){
   const ctx = getCtx();
   const src = ctx.createBufferSource();
   src.buffer = S.procBuffer || S.rawBuffer;
+  const gMain = ctx.createGain();
+  gMain.gain.value = S.abOriginal ? 0 : 1;
+  const sum = ctx.createGain();
+  src.connect(gMain); gMain.connect(sum);
+  // A/B 비교: 원본(음량 매칭) 버퍼를 동시에 재생하고 게인만 전환 → 끊김 없는 비교
+  let srcAB = null, gAB = null;
+  if(S.rawMatched && S.rawMatched !== S.procBuffer){
+    srcAB = ctx.createBufferSource();
+    srcAB.buffer = S.rawMatched;
+    gAB = ctx.createGain();
+    gAB.gain.value = S.abOriginal ? 1 : 0;
+    srcAB.connect(gAB); gAB.connect(sum);
+  }
   const fade = ctx.createGain();
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.8;
   const gain = ctx.createGain();
   gain.gain.value = monitorOn ? 1 : 0;
-  src.connect(fade);
+  sum.connect(fade);
   fade.connect(analyser);
   analyser.connect(gain);
   gain.connect(ctx.destination);
-  return {src, analyser, gain, fade};
+  return {src, srcAB, gMain, gAB, analyser, gain, fade};
 }
 
 let previewRAF = null;
 function stopPreview(){
-  if(S.playNodes){ try{S.playNodes.src.stop();}catch(e){} S.playNodes=null; }
+  if(S.playNodes){
+    try{S.playNodes.src.stop();}catch(e){}
+    if(S.playNodes.srcAB){ try{S.playNodes.srcAB.stop();}catch(e){} }
+    S.playNodes=null;
+  }
   S.playing = false;
   cancelAnimationFrame(previewRAF);
   $("btnPreview").textContent = "▶ 미리듣기";
@@ -1046,6 +1237,7 @@ function startPreview(){
   S.curDur = dur;
   scheduleFade(nodes.fade, getCtx(), t0, dur);
   nodes.src.start();
+  if(nodes.srcAB) nodes.srcAB.start();   // 동일 시점 시작 → 샘플 동기 유지
   nodes.src.onended = stopPreview;
   $("btnPreview").textContent = "■ 정지";
   const loop = ()=>{
@@ -1229,6 +1421,22 @@ function init(){
     S.targetLUFS = parseFloat(e.target.value);
     $("lufsLabel").textContent = S.targetLUFS.toFixed(1) + " LUFS";
   });
+  $("amtRange").addEventListener("input", e=>{
+    S.amount = parseFloat(e.target.value);
+    $("amtLabel").textContent = Math.round(S.amount*100) + "%";
+  });
+  bindChips("fontChips", v=>{ selectFont(v); });
+  $("btnAB").addEventListener("click", ()=>{
+    S.abOriginal = !S.abOriginal;
+    $("btnAB").textContent = "A/B: " + (S.abOriginal ? "원본" : "마스터");
+    $("btnAB").classList.toggle("hot", S.abOriginal);
+    if(S.playing && S.playNodes && S.playNodes.gAB){
+      // 재생 중이면 30ms 크로스페이드로 즉시 전환 (클릭 노이즈 방지)
+      const t = getCtx().currentTime + 0.03;
+      S.playNodes.gMain.gain.linearRampToValueAtTime(S.abOriginal ? 0 : 1, t);
+      S.playNodes.gAB.gain.linearRampToValueAtTime(S.abOriginal ? 1 : 0, t);
+    }
+  });
   $("btnProcess").addEventListener("click", processAudio);
   $("btnWav").addEventListener("click", ()=>{
     if(!S.procBuffer) return;
@@ -1288,6 +1496,55 @@ function init(){
   toggle("chipMood","moodShift");
   toggle("chipFade","fade");
   toggle("chipFx","fxOverlay");
+  toggle("chipDust","dust");
+  toggle("chipCine","cine");
+  toggle("chipGlow","glowBoost");
+
+  // ---------- 배치 조정: 미리보기 드래그 ----------
+  bindChips("dragChips", v=>{
+    S.dragTarget = v;
+    $("previewCanvas").classList.toggle("dragmode", v!=="off");
+    if(v!=="off") toast(v==="viz" ? "화면을 드래그해 비주얼라이저 이동" : "화면을 드래그해 제목 이동", 2000);
+  });
+  const pvEl = $("previewCanvas");
+  let dragging = false;
+  const dragApply = e => {
+    const r = pvEl.getBoundingClientRect();
+    const cl = v => Math.min(0.95, Math.max(0.05, v));
+    const p = {x: cl((e.clientX-r.left)/r.width), y: cl((e.clientY-r.top)/r.height)};
+    if(S.dragTarget==="viz") S.vizPos = p;
+    else if(S.dragTarget==="text") S.textPos = p;
+    if(!S.playing && !S.rendering) drawFrame(null);
+  };
+  pvEl.addEventListener("pointerdown", e=>{
+    if(S.dragTarget==="off") return;
+    dragging = true; e.preventDefault(); dragApply(e);
+  });
+  window.addEventListener("pointermove", e=>{ if(dragging) dragApply(e); });
+  window.addEventListener("pointerup", ()=>{ dragging = false; });
+
+  $("vscaleRange").addEventListener("input", e=>{
+    S.vizScale = parseFloat(e.target.value);
+    $("vscaleLabel").textContent = Math.round(S.vizScale*100)+"%";
+    if(!S.playing && !S.rendering) drawFrame(null);
+  });
+  $("tscaleRange").addEventListener("input", e=>{
+    S.textScale = parseFloat(e.target.value);
+    $("tscaleLabel").textContent = Math.round(S.textScale*100)+"%";
+    if(!S.playing && !S.rendering) drawFrame(null);
+  });
+  $("btnResetPos").addEventListener("click", ()=>{
+    S.vizPos = {x:0.5, y:0.44}; S.vizScale = 1;
+    S.textPos = {x:0.5, y:0.90}; S.textScale = 1;
+    $("vscaleRange").value = 1; $("vscaleLabel").textContent = "100%";
+    $("tscaleRange").value = 1; $("tscaleLabel").textContent = "100%";
+    drawFrame(null);
+    toast("배치 초기화됨");
+  });
+  $("toast").addEventListener("click", ()=>{
+    $("toast").classList.remove("show");
+    clearTimeout($("toast")._h);
+  });
   $("sensRange").addEventListener("input", e=>{
     S.sens = parseFloat(e.target.value);
     $("sensLabel").textContent = S.sens.toFixed(1) + "×";
