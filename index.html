@@ -366,7 +366,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p class="notice" id="renderNote">렌더 중 다른 앱으로 이동하거나 화면을 잠그면 작업이 멈춥니다.</p>
 </section>
 
-<footer>LUMATONE v2.3 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v2.4 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="editWrap">
@@ -2384,6 +2384,7 @@ function saveLook(){
     kb:S.kb, pump:S.pump, moodShift:S.moodShift, fade:S.fade, fxOverlay:S.fxOverlay,
     beatFx:S.beatFx, beatCut:S.beatCut,
     spot:S.spot, vign:S.vign, hueCycle:S.hueCycle, film:S.film,
+    fastRender:S.fastRender,
     dust:S.dust, cine:S.cine, glowBoost:S.glowBoost, artFlow:S.artFlow,
     vizPos:S.vizPos, vizScale:S.vizScale, textPos:S.textPos, textScale:S.textScale,
     artist: $("artistInput") ? $("artistInput").value : "",
@@ -4054,18 +4055,68 @@ function endRenderUI(){
   $("btnPreview").disabled = false;
 }
 
+// 파일 전달: PWA(홈화면 앱)에서 blob 링크 탐색이 막히는 iOS 제약 대응
+// → Web Share API(공유 시트)로 파일을 직접 전달, 미지원 시 앵커 다운로드 폴백
+async function deliverFile(blob, name){
+  try{
+    const file = new File([blob], name, {type: blob.type || "application/octet-stream"});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{
+        await navigator.share({files:[file]});
+        return;
+      }catch(e){
+        if(e.name === "AbortError") return;   // 사용자가 공유 시트를 닫음 — 정상
+        console.warn("[LUMATONE] share 실패, 다운로드 폴백:", e);
+      }
+    }
+  }catch(e){ console.warn("[LUMATONE] File 생성 실패, 다운로드 폴백:", e); }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 function showResult(blob, ext){
   const url = URL.createObjectURL(blob);
   const title = ($("titleInput").value.trim()
     || (S.tracks[0] && S.tracks[0].title)
     || S.fileName.replace(/\.[^.]+$/,"") || "output")
     + (S.tracks.length > 1 ? ` 외 ${S.tracks.length-1}곡` : "");
-  $("resultVideo").src = url;
-  const a = $("btnDownload");
-  a.href = url; a.download = `[MV] ${title}.${ext}`;
+  $("resultVideo").src = url;             // 페이지 내 미리보기는 blob URL로 정상 동작
+  S.lastBlob = blob;
+  S.lastName = `[MV] ${title}.${ext}`;
   $("resultBox").style.display = "block";
   $("n5").classList.add("done");
   $("resultBox").scrollIntoView({behavior:"smooth"});
+}
+
+// 결과물이 이 기기에서 실제로 재생 가능한지 즉석 검증 (4초 타임아웃)
+function verifyPlayable(blob){
+  return new Promise(res=>{
+    const v = document.createElement("video");
+    v.muted = true; v.playsInline = true; v.preload = "metadata";
+    const u = URL.createObjectURL(blob);
+    const done = ok => { clearTimeout(tm); v.removeAttribute("src"); URL.revokeObjectURL(u); res(ok); };
+    const tm = setTimeout(()=>done(false), 4000);
+    v.onloadedmetadata = ()=> done(isFinite(v.duration) && v.duration > 0);
+    v.onerror = ()=> done(false);
+    v.src = u;
+  });
+}
+
+// 고속 렌더 호환 문제 확인 시: 이 기기에서 영구 비활성화 + 안내
+function disableFast(reason){
+  console.warn("[LUMATONE] 고속 렌더 비활성화:", reason);
+  S.fastRender = false;
+  fastOK = false;
+  $("chipFastR").classList.remove("on");
+  $("chipFastR").style.display = "none";
+  $("fastNote").textContent = "이 기기와 호환 문제가 확인되어 실시간 렌더로 전환되었습니다";
+  $("renderNote").textContent = "실시간 렌더 모드: 곡 길이만큼 걸립니다 (3분 곡 = 약 3분). 렌더 중 다른 앱 이동·화면 잠금 시 녹화가 멈춥니다.";
+  saveLook();
+  toast("고속 렌더 호환 문제(" + reason + ") — 실시간 모드로 전환했습니다. 렌더를 다시 눌러주세요", 5000);
 }
 
 async function fastRender(){
@@ -4098,14 +4149,40 @@ async function fastRender(){
   let ve=null, ae=null, encErr=null;
   const t1 = performance.now();
   try{
-    const codec = (W*H > 1_000_000) ? "avc1.42E028" : "avc1.42E01F";  // L4.0 / L3.1
+    // 코덱 후보: 애플 하드웨어 인코더 선호 순 (High → Main → Baseline)
+    const cands = (W*H > 1_000_000)
+      ? ["avc1.640028","avc1.4D4028","avc1.42E028"]
+      : ["avc1.64001F","avc1.4D401F","avc1.42E01F"];
+    let codec = null;
+    for(const c2 of cands){
+      try{
+        const r = await VideoEncoder.isConfigSupported(
+          {codec:c2, width:W, height:H, bitrate:12_000_000, framerate:fps});
+        if(r.supported){ codec = c2; break; }
+      }catch(e){}
+    }
+    if(!codec) throw new Error("지원되는 H.264 프로파일 없음");
     const muxer = new Mp4Muxer.Muxer({
       target: new Mp4Muxer.ArrayBufferTarget(),
       video: {codec:"avc", width:W, height:H},
       audio: {codec:"aac", sampleRate:projSR, numberOfChannels:2},
       fastStart: "in-memory",
     });
-    ve = new VideoEncoder({output:(c,m)=>muxer.addVideoChunk(c,m), error:e=>{encErr=e;}});
+    let gotDesc = false;
+    ve = new VideoEncoder({
+      output:(c,m)=>{
+        if(!gotDesc){
+          // 첫 키프레임에 avcC(decoderConfig.description)가 없으면 MP4가 깨짐 → 즉시 중단
+          if(!(m && m.decoderConfig && m.decoderConfig.description)){
+            encErr = new Error("avcC 미제공");
+            return;
+          }
+          gotDesc = true;
+        }
+        muxer.addVideoChunk(c,m);
+      },
+      error:e=>{encErr=e;}
+    });
     ve.configure({codec, width:W, height:H, bitrate:12_000_000, framerate:fps, avc:{format:"avc"}});
     ae = new AudioEncoder({output:(c,m)=>muxer.addAudioChunk(c,m), error:e=>{encErr=e;}});
     ae.configure({codec:"mp4a.40.2", sampleRate:projSR, numberOfChannels:2, bitrate:192_000});
@@ -4159,20 +4236,25 @@ async function fastRender(){
       muxer.finalize();
       const blob = new Blob([muxer.target.buffer], {type:"video/mp4"});
       const speed = dur / ((performance.now()-t1)/1000);
+      const playable = await verifyPlayable(blob);   // 이 기기에서 실제 재생 가능한지 검증
       endRenderUI();
-      showResult(blob, "mp4");
-      toast(`✓ 고속 렌더 완료 — ${speed.toFixed(1)}배속 · ${(blob.size/1048576).toFixed(1)} MB`, 4000);
+      if(playable){
+        showResult(blob, "mp4");
+        toast(`✓ 고속 렌더 완료 — ${speed.toFixed(1)}배속 · ${(blob.size/1048576).toFixed(1)} MB`, 4000);
+      }else{
+        disableFast("결과물 재생 불가");
+      }
     }else{
       endRenderUI();
       if(encErr){
         console.error("[LUMATONE] 고속 렌더 인코더 오류:", encErr);
-        toast("고속 렌더 실패 — ⚡를 끄고 실시간 모드로 시도해보세요", 4500);
+        disableFast(encErr.message || "인코더 오류");
       }
     }
   }catch(err){
     console.error("[LUMATONE] 고속 렌더 실패:", err);
     endRenderUI();
-    toast("고속 렌더 실패: " + err.message + " — ⚡를 끄면 실시간 모드", 4500);
+    disableFast(err.message || "알 수 없는 오류");
   }finally{
     try{ if(ve && ve.state!=="closed") ve.close(); }catch(e){}
     try{ if(ae && ae.state!=="closed") ae.close(); }catch(e){}
@@ -4421,12 +4503,9 @@ function saveThumbnail(){
   S.rendering = wasR; S.renderCanvas = wasC;
   c.toBlob(b=>{
     if(!b){ toast("썸네일 생성 실패"); return; }
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(b);
     const title = $("titleInput").value.trim() || (S.tracks[0] && S.tracks[0].title) || "thumbnail";
-    a.download = `[THUMB] ${title}.png`;
-    a.click();
-    toast("✓ 썸네일 저장 — 공유 시트에서 이미지 저장", 3000);
+    deliverFile(b, `[THUMB] ${title}.png`);
+    toast("썸네일 — 공유 시트에서 이미지 저장을 선택하세요", 3000);
   }, "image/png");
 }
 
@@ -4463,6 +4542,11 @@ function init(){
   });
   $("btnThumb").addEventListener("click", saveThumbnail);
   $("btnDesc").addEventListener("click", copyDescription);
+  $("btnDownload").addEventListener("click", e=>{
+    e.preventDefault();
+    if(!S.lastBlob){ toast("먼저 렌더를 완료하세요"); return; }
+    deliverFile(S.lastBlob, S.lastName || "output.mp4");
+  });
 
   bindChips("presetChips", v=>{ S.preset=v; });
   $("lufsRange").addEventListener("input", e=>{
@@ -4491,12 +4575,9 @@ function init(){
     const proc = S.tracks[0] && S.tracks[0].proc;
     if(!proc) return;
     const blob = encodeWAV24(proc);
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
     const title = $("titleInput").value.trim() || "master";
-    a.download = `[MASTER] ${title}.wav`;
-    a.click();
-    toast("24bit WAV 저장 — 공유 시트에서 파일 앱 선택");
+    deliverFile(blob, `[MASTER] ${title}.wav`);
+    toast("24bit WAV — 공유 시트에서 파일에 저장을 선택하세요");
   });
 
   $("bgTabs").addEventListener("click", e=>{
@@ -4823,6 +4904,10 @@ function init(){
         S.sens = L.sens;
         $("sensRange").value = L.sens;
         $("sensLabel").textContent = L.sens.toFixed(1) + "×";
+      }
+      if(typeof L.fastRender === "boolean"){
+        S.fastRender = L.fastRender;
+        $("chipFastR").classList.toggle("on", L.fastRender);
       }
       if(L.vizPos) S.vizPos = L.vizPos;
       if(typeof L.vizScale === "number"){
