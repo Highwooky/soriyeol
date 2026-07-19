@@ -366,7 +366,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p class="notice" id="renderNote">렌더 중 다른 앱으로 이동하거나 화면을 잠그면 작업이 멈춥니다.</p>
 </section>
 
-<footer>LUMATONE v2.4 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v2.5 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="editWrap">
@@ -2350,6 +2350,7 @@ const S = {
   lpAngle: 0,
   quality: 1080,
   fastRender: true,        // 고속(WebCodecs) 렌더 사용 — 미지원 시 자동 실시간 폴백
+  fastActive: false, fastSkipPreview: false,   // 고속 렌더 중 미리보기 드로우 생략 (속도 ~2배)
   playing: false, rendering: false,
   playNodes: null,         // {src, analyser, gain}
   recorder: null, recChunks: [],
@@ -3195,7 +3196,8 @@ function drawFrame(audio, progress, tOverride){
 
   const targets = [];
   const pv = $("previewCanvas");
-  targets.push({canvas: pv});
+  // 고속 렌더 중에는 미리보기 캔버스 드로우를 12프레임에 1회만 (이중 드로우 제거 → 속도 ~2배)
+  if(!(S.fastActive && S.fastSkipPreview)) targets.push({canvas: pv});
   if(S.rendering && S.renderCanvas) targets.push({canvas: S.renderCanvas});
 
   let freq=null, wave=null, bass=0;
@@ -3847,7 +3849,7 @@ function drawFrame(audio, progress, tOverride){
   S.accent = accentSaved;   // 레인보우 글로우 오버라이드 복원
   // ---------- 플로팅 미니 미리보기 (본 미리보기가 화면 밖일 때) ----------
   const miniWrap = $("miniWrap");
-  if(miniWrap && miniWrap.classList.contains("show")){
+  if(miniWrap && miniWrap.classList.contains("show") && !(S.fastActive && S.fastSkipPreview)){
     const mini = $("miniCanvas");
     mini.getContext("2d").drawImage(pv, 0, 0, mini.width, mini.height);
   }
@@ -4038,7 +4040,7 @@ async function checkFastSupport(){
   try{
     if(!window.VideoEncoder || !window.AudioEncoder || !window.Mp4Muxer) return fastOK=false;
     const v = await VideoEncoder.isConfigSupported(
-      {codec:"avc1.42E028", width:1920, height:1080, bitrate:12_000_000, framerate:30});
+      {codec:"avc1.42E028", width:1920, height:1080, bitrate:10_000_000, framerate:30});
     const a = await AudioEncoder.isConfigSupported(
       {codec:"mp4a.40.2", sampleRate:44100, numberOfChannels:2, bitrate:192_000});
     fastOK = !!(v.supported && a.supported);
@@ -4049,6 +4051,7 @@ async function checkFastSupport(){
 function endRenderUI(){
   S.rendering = false;
   S.renderCanvas = null;
+  store.set("lumatone.rflag", null);
   if(S.wakeLock){ try{S.wakeLock.release();}catch(e){} S.wakeLock=null; }
   $("progressWrap").style.display = "none";
   $("btnRender").disabled = false;
@@ -4137,7 +4140,10 @@ async function fastRender(){
   rc.width = W; rc.height = H;
   S.renderCanvas = rc;
   S.rendering = true;
+  S.fastActive = true;
   S.renderStop = null;   // 고속 모드는 S.rendering 플래그로 취소
+  store.set("lumatone.rflag", {t:Date.now(), q:S.quality});   // 메모리 크래시 감지용
+  const VBR = S.quality===1080 ? 10_000_000 : 6_000_000;
   $("pTotal").textContent = fmtTime(dur);
   $("progressWrap").style.display = "block";
   $("resultBox").style.display = "none";
@@ -4157,7 +4163,7 @@ async function fastRender(){
     for(const c2 of cands){
       try{
         const r = await VideoEncoder.isConfigSupported(
-          {codec:c2, width:W, height:H, bitrate:12_000_000, framerate:fps});
+          {codec:c2, width:W, height:H, bitrate:VBR, framerate:fps});
         if(r.supported){ codec = c2; break; }
       }catch(e){}
     }
@@ -4183,7 +4189,7 @@ async function fastRender(){
       },
       error:e=>{encErr=e;}
     });
-    ve.configure({codec, width:W, height:H, bitrate:12_000_000, framerate:fps, avc:{format:"avc"}});
+    ve.configure({codec, width:W, height:H, bitrate:VBR, framerate:fps, avc:{format:"avc"}});
     ae = new AudioEncoder({output:(c,m)=>muxer.addAudioChunk(c,m), error:e=>{encErr=e;}});
     ae.configure({codec:"mp4a.40.2", sampleRate:projSR, numberOfChannels:2, bitrate:192_000});
 
@@ -4218,6 +4224,7 @@ async function fastRender(){
     for(let f=0; f<frames; f++){
       if(!S.rendering || encErr) break;
       const t = f/fps;
+      S.fastSkipPreview = (f % 12 !== 0);
       fake.update(t);
       drawFrame(nodes, t/dur, t);
       const vf = new VideoFrame(rc, {timestamp:Math.round(t*1e6), duration:Math.round(1e6/fps)});
@@ -4256,6 +4263,7 @@ async function fastRender(){
     endRenderUI();
     disableFast(err.message || "알 수 없는 오류");
   }finally{
+    S.fastActive = false; S.fastSkipPreview = false;
     try{ if(ve && ve.state!=="closed") ve.close(); }catch(e){}
     try{ if(ae && ae.state!=="closed") ae.close(); }catch(e){}
   }
@@ -4316,7 +4324,8 @@ async function startRender(){
 
   const vStream = rc.captureStream(30);
   const stream = new MediaStream([...vStream.getVideoTracks(), ...recDest.stream.getAudioTracks()]);
-  const recorder = new MediaRecorder(stream, {mimeType:mime, videoBitsPerSecond: 12_000_000});
+  const recorder = new MediaRecorder(stream,
+    {mimeType:mime, videoBitsPerSecond: S.quality===1080 ? 10_000_000 : 6_000_000});
   S.recChunks = [];
   recorder.ondataavailable = e => { if(e.data && e.data.size) S.recChunks.push(e.data); };
   recorder.onstop = () => finishRender(mime);
@@ -4334,6 +4343,7 @@ async function startRender(){
   $("btnRender").disabled = true;
   $("btnPreview").disabled = true;
   S.rendering = true;
+  store.set("lumatone.rflag", {t:Date.now(), q:S.quality});   // 메모리 크래시 감지용
 
   recorder.start(1000);
   if(S.bgMode==="video" && S.bgVideo){ S.bgVideo.currentTime = 0; S.bgVideo.play().catch(()=>{}); }
@@ -4367,6 +4377,7 @@ function finishRender(mime){
 }
 
 function cancelRender(){
+  store.set("lumatone.rflag", null);
   if(S.renderStop) S.renderStop();
   S.rendering = false;
   S.recChunks = [];
@@ -4859,7 +4870,7 @@ function init(){
       $("fastNote").textContent = "이 기기는 실시간 렌더만 지원합니다 (iOS 16.4+ 권장)";
       $("renderNote").textContent = "이 기기는 실시간 렌더 모드입니다: 곡 길이만큼 걸립니다 (3분 곡 = 약 3분). 렌더 중 다른 앱 이동·화면 잠금 시 녹화가 멈춥니다.";
     }else{
-      $("renderNote").textContent = "⚡ 고속 렌더: 곡 길이보다 훨씬 빠르게 완료됩니다 (기기 성능에 따라 2~8배속). 단, 렌더 중 화면은 켜둔 채 앱에 머물러주세요. ⚡를 끄면 실시간 녹화 모드로 동작합니다.";
+      $("renderNote").textContent = "⚡ 고속 렌더: 곡 길이보다 빠르게 완료됩니다. 화질을 720p로 낮추면 속도가 크게 오르고 메모리도 안정적입니다 (긴 곡·플리 권장). 렌더 중 화면은 켜둔 채 앱에 머물러주세요.";
     }
   });
 
@@ -4933,6 +4944,18 @@ function init(){
         setRatioCanvas();
       }
     }catch(err){ console.warn("[LUMATONE] 설정 복원 일부 실패:", err); }
+  })();
+
+  // 이전 세션이 렌더 중 비정상 종료(메모리 크래시)됐는지 감지
+  (function crashCheck(){
+    const rf = store.get("lumatone.rflag");
+    if(!rf) return;
+    store.set("lumatone.rflag", null);
+    if(S.quality !== 720){
+      S.quality = 720;
+      $("qBtn").textContent = "화질 720p";
+    }
+    toast("⚠ 이전 렌더 중 메모리 부족으로 재시작된 것 같습니다 — 안정성을 위해 화질을 720p로 낮췄습니다 (긴 곡/플리 권장)", 6500);
   })();
 
   refreshArt(false);
