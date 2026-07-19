@@ -376,7 +376,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p class="notice" id="renderNote">렌더 중 다른 앱으로 이동하거나 화면을 잠그면 작업이 멈춥니다.</p>
 </section>
 
-<footer>LUMATONE v2.9 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v3.0 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -3258,7 +3258,9 @@ function drawFrame(audio, progress, tOverride){
     // 배치 파라미터: VS=크기 배율, dy=기본 위치 대비 세로 오프셋, GB=글로우 부스트
     const VS = S.vizScale;
     const dy = (S.vizPos.y - 0.44) * h;
-    const GB = S.glowBoost ? 2.2 : 1;
+    // GB=글로우 부스트. 고속 렌더 중엔 shadowBlur가 프레임당 최대 병목이라 절반으로 낮춤
+    // (블러는 시각적으로 완만해 절반이어도 육안 구분이 거의 없음)
+    const GB = (S.glowBoost ? 2.2 : 1) * (S.fastActive ? 0.5 : 1);
 
     drawBackground(x, w, h, p===null ? 0 : p, tSec);
 
@@ -3994,44 +3996,53 @@ function fftRadix2(re, im){
 
 // AnalyserNode 대체: 임의 시점 t의 스펙트럼/파형을 트랙 타임라인에서 직접 계산
 function makeOfflineAnalyser(projSR){
-  const N=2048, HALF=1024;
-  const spans=[]; let acc=0;
+  // ⚡ 최적화: N=1024 (FFT 비용 절반) + 전 트랙 연속 모노 병합(선형탐색 제거)
+  //   + 파형(timeB)은 FFT 입력 창을 재활용해 별도 2048 루프 제거
+  //   + Math.hypot→sqrt, log10→상수배 log (핫루프 경량화)
+  const N=1024, HALF=512;
+  let total=0;
+  for(const t of S.tracks) total += t.proc.length;
+  const mono = new Float32Array(total);
+  let off=0;
   for(const t of S.tracks){
     const b=t.proc;
-    spans.push({start:acc, len:b.length,
-      ch0:b.getChannelData(0),
-      ch1:b.numberOfChannels>1 ? b.getChannelData(1) : b.getChannelData(0)});
-    acc += b.length;
+    const c0=b.getChannelData(0);
+    const c1=b.numberOfChannels>1 ? b.getChannelData(1) : c0;
+    for(let i=0;i<b.length;i++) mono[off+i]=(c0[i]+c1[i])*0.5;
+    off += b.length;
   }
-  const total=acc;
-  const sampleAt = gi=>{
-    if(gi<0 || gi>=total) return 0;
-    for(const s of spans)
-      if(gi < s.start+s.len){ const i=gi-s.start; return (s.ch0[i]+s.ch1[i])*0.5; }
-    return 0;
-  };
   const win=new Float32Array(N);
-  for(let i=0;i<N;i++)   // Blackman 윈도우 (AnalyserNode와 동일 계열)
+  for(let i=0;i<N;i++)
     win[i]=0.42 - 0.5*Math.cos(2*Math.PI*i/(N-1)) + 0.08*Math.cos(4*Math.PI*i/(N-1));
   const re=new Float32Array(N), im=new Float32Array(N);
+  const raw=new Float32Array(N);           // 창 적용 전 원신호 (파형 표시용 재활용)
   const magS=new Float32Array(HALF);
-  const freqB=new Uint8Array(HALF), timeB=new Uint8Array(N);
+  const freqB=new Uint8Array(1024), timeB=new Uint8Array(2048);
   const SM=0.8, NORM=2/(N*0.42);
+  const LOG_K = 20/Math.LN10;              // 20*log10(x) = LOG_K*ln(x)
   return {
-    fftSize:N, frequencyBinCount:HALF,
+    fftSize:2048, frequencyBinCount:1024,
     update(tSec){
-      const end=Math.floor(tSec*projSR);
+      const end=Math.floor(tSec*projSR), base=end-N;
       for(let i=0;i<N;i++){
-        const v=sampleAt(end-N+i);
-        timeB[i]=Math.max(0, Math.min(255, (v*128+128)|0));
-        re[i]=v*win[i]; im[i]=0;
+        const gi=base+i;
+        const v=(gi<0||gi>=total)?0:mono[gi];
+        raw[i]=v; re[i]=v*win[i]; im[i]=0;
+      }
+      // 파형: raw(N=1024)를 2048로 최근접 복제 (보간 제거 → 병목 해소)
+      for(let i=0;i<N;i++){
+        let b=(raw[i]*128+128)|0; b=b<0?0:b>255?255:b;
+        timeB[i*2]=b; timeB[i*2+1]=b;
       }
       fftRadix2(re, im);
       for(let k=0;k<HALF;k++){
-        const m=Math.hypot(re[k], im[k])*NORM;
-        magS[k]=SM*magS[k] + (1-SM)*m;                     // AnalyserNode 스무딩 재현
-        const db=20*Math.log10(magS[k]+1e-10);
-        freqB[k]=Math.max(0, Math.min(255, ((db+100)/70*255)|0));   // -100~-30dB 매핑
+        const rk=re[k], ik=im[k];
+        const m=Math.sqrt(rk*rk+ik*ik)*NORM;              // hypot보다 빠름
+        magS[k]=SM*magS[k] + (1-SM)*m;
+        const db=LOG_K*Math.log(magS[k]+1e-10);           // log10 대체
+        let val=((db+100)/70*255)|0;
+        val = val<0?0 : val>255?255 : val;
+        freqB[k*2]=val; freqB[k*2+1]=val;                 // 512→1024 업샘플
       }
     },
     getByteFrequencyData(a){ a.set(freqB); },
@@ -4251,7 +4262,8 @@ async function fastRender(){
   let ve=null, ae=null, encErr=null;
   const DG = {mode:"fast", w:W, h:H, sr:projSR, dur:+dur.toFixed(1), tracks:S.tracks.length,
     codec:null, vChunks:0, aChunks:0, aBytes:0, adts:false, descFrom:null, descHex:null,
-    vVideo:null, vAudio:null, fail:null};
+    vVideo:null, vAudio:null, fail:null,
+    frames:0, msFFT:0, msDraw:0, msEnc:0, msWait:0};
   S.diag = DG;
   const t1 = performance.now();
   try{
@@ -4364,17 +4376,21 @@ async function fastRender(){
     // ---- 비디오 인코드: 오프라인 드로우 → 하드웨어 H.264 ----
     const fake = makeOfflineAnalyser(projSR);
     const nodes = {analyser:fake};
+    let tFFT=0, tDraw=0, tEnc=0, tWait=0;   // 구간별 누적 소요 (진단용)
     for(let f=0; f<frames; f++){
       if(!S.rendering || encErr) break;
       const t = f/fps;
       S.fastSkipPreview = (f % 12 !== 0);
-      fake.update(t);
-      drawFrame(nodes, t/dur, t);
+      let m0=performance.now();
+      fake.update(t);                        m0 = (tFFT  += performance.now()-m0, performance.now());
+      drawFrame(nodes, t/dur, t);            m0 = (tDraw += performance.now()-m0, performance.now());
       const vf = new VideoFrame(rc, {timestamp:Math.round(t*1e6), duration:Math.round(1e6/fps)});
       ve.encode(vf, {keyFrame: f % (fps*5) === 0});
-      vf.close();
-      while(ve.encodeQueueSize > 8) await new Promise(r=>setTimeout(r,0));
-      if(f % 5 === 0) await new Promise(r=>setTimeout(r,0));   // rAF(16.7ms 강제대기) 대신 최소 양보
+      vf.close();                            m0 = (tEnc  += performance.now()-m0, performance.now());
+      // 인코더 큐가 쌓일 때만 양보 (평소엔 논스톱 진행)
+      while(ve.encodeQueueSize > 10){ await new Promise(r=>setTimeout(r,0)); }
+      if((f & 31) === 0) await new Promise(r=>setTimeout(r,0));   // 32프레임마다 UI 숨통
+      tWait += performance.now()-m0;
       if(f % 15 === 0){
         $("pFill").style.width = (f/frames*100).toFixed(1)+"%";
         $("pTime").textContent = fmtTime(t);
@@ -4383,12 +4399,16 @@ async function fastRender(){
         $("dimPct").textContent = (f/frames*100).toFixed(0)+"%";
       }
     }
+    DG.msFFT = Math.round(tFFT); DG.msDraw = Math.round(tDraw);
+    DG.msEnc = Math.round(tEnc); DG.msWait = Math.round(tWait);
+    DG.frames = frames;
 
     if(S.rendering && !encErr){
       await ve.flush(); await ae.flush();
       muxer.finalize();
       const blob = new Blob([muxer.target.buffer], {type:"video/mp4"});
       const speed = dur / ((performance.now()-t1)/1000);
+      DG.speed = +speed.toFixed(2);
       const playable = await verifyPlayable(blob);   // 영상 트랙 검증
       const audioOk = playable ? await verifyAudio(blob) : false;   // 오디오 트랙 해부 검사
       DG.vVideo = playable; DG.vAudio = audioOk; DG.mb = +(blob.size/1048576).toFixed(1);
@@ -4721,7 +4741,7 @@ function init(){
   $("btnDesc").addEventListener("click", copyDescription);
   $("btnDiag").addEventListener("click", async ()=>{
     const info = {
-      app: "LUMATONE v2.9",
+      app: "LUMATONE v3.0",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
