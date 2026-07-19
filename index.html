@@ -127,6 +127,11 @@ input[type=text]:focus{border-color:var(--accent)}
 .edhint{font-size:.72rem;color:var(--sub);text-align:center}
 body.renderlock .step:not(#stepRender){opacity:.45;pointer-events:none}
 body.renderlock #miniWrap{pointer-events:none}
+#dimWrap{position:fixed;inset:0;z-index:95;background:#000;display:none;
+  flex-direction:column;align-items:center;justify-content:center;gap:10px}
+#dimWrap.open{display:flex}
+#dimWrap .dimpct{font-size:3.4rem;font-weight:800;color:#2a2f36;letter-spacing:-0.02em}
+#dimWrap .dimsub{font-size:.78rem;color:#23272d}
 footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-height:1.7}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -358,19 +363,22 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <div class="progresswrap" id="progressWrap">
     <div class="pbar"><div id="pFill"></div></div>
     <div class="ptext"><span id="pTime">0:00</span><span id="pMode">렌더 중 — 화면을 끄지 마세요</span><span id="pTotal">0:00</span></div>
-    <button class="btn small full" id="btnCancel" style="margin-top:10px">취소</button>
+    <button class="btn small full" id="btnDim" style="margin-top:10px">🌙 절전 화면으로 렌더 (배터리 절약)</button>
+    <button class="btn small full" id="btnCancel" style="margin-top:8px">취소</button>
   </div>
   <div class="result" id="resultBox">
     <video id="resultVideo" controls playsinline></video>
     <a class="btn primary full" id="btnDownload" style="margin-top:10px">영상 저장</a>
-    <p class="notice">아이폰: 저장 버튼 → 공유 시트에서 <b>"비디오 저장"</b>을 누르면 사진 앱에 들어갑니다. 이후 유튜브 앱에서 바로 업로드하세요.</p>
+    <p class="notice">아이폰: 저장 버튼 → 공유 시트에서 <b>"비디오 저장"</b>을 누르면 사진 앱에 들어갑니다. 이후 유튜브 앱에서 바로 업로드하세요.<br>
+🔇 <b>미리보기에서 소리가 안 들리면 측면 무음 스위치를 확인하세요</b> — 무음 모드에선 웹 영상 소리가 재생되지 않습니다 (파일에는 정상 포함).</p>
   </div>
   <p class="notice" id="renderNote">렌더 중 다른 앱으로 이동하거나 화면을 잠그면 작업이 멈춥니다.</p>
 </section>
 
-<footer>LUMATONE v2.6 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v2.7 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
+<div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
 <div id="editWrap">
   <div class="edbar" id="edSlides"></div>
   <canvas id="editCanvas" width="960" height="540"></canvas>
@@ -4056,6 +4064,7 @@ function endRenderUI(){
   S.rendering = false;
   S.renderCanvas = null;
   document.body.classList.remove("renderlock");
+  $("dimWrap").classList.remove("open");
   $("pMode").textContent = "렌더 중 — 화면을 끄지 마세요";
   store.set("lumatone.rflag", null);
   if(S.wakeLock){ try{S.wakeLock.release();}catch(e){} S.wakeLock=null; }
@@ -4119,6 +4128,38 @@ function verifyPlayable(blob){
     const tm = setTimeout(()=>done(false), 4000);
     v.onloadedmetadata = ()=> done(isFinite(v.duration) && v.duration > 0);
     v.onerror = ()=> done(false);
+    v.src = u;
+  });
+}
+
+// 오디오 트랙 자가 진단: true=정상 / false=트랙 불량·무음 / null=판정 불가
+async function verifyAudio(blob){
+  // 1차: 오디오 디코드 + 에너지 검사 (가장 확실)
+  try{
+    const ab = await blob.arrayBuffer();
+    const buf = await getCtx().decodeAudioData(ab);
+    const d = buf.getChannelData(0);
+    let peak = 0;
+    const step = Math.max(1, Math.floor(d.length/50000));
+    for(let i=0;i<d.length;i+=step){ const a=Math.abs(d[i]); if(a>peak) peak=a; }
+    return buf.duration > 0 && peak > 0.001;
+  }catch(e){ console.warn("[LUMATONE] 오디오 1차 판정 불가:", e.message); }
+  // 2차: 재생 기반 디코드 바이트 카운트 (WebKit)
+  return await new Promise(res=>{
+    const v = document.createElement("video");
+    v.muted = true; v.playsInline = true;
+    const u = URL.createObjectURL(blob);
+    const done = r => { try{v.pause();}catch(e){} URL.revokeObjectURL(u); res(r); };
+    const tm = setTimeout(()=>done(null), 5000);
+    v.onerror = ()=>{ clearTimeout(tm); done(false); };
+    v.onloadeddata = async ()=>{
+      try{ await v.play(); }catch(e){}
+      setTimeout(()=>{
+        clearTimeout(tm);
+        const n = v.webkitAudioDecodedByteCount;
+        done(n === undefined ? null : n > 0);
+      }, 800);
+    };
     v.src = u;
   });
 }
@@ -4274,6 +4315,7 @@ async function fastRender(){
         $("pTime").textContent = fmtTime(t);
         const sp = t / Math.max(0.001, (performance.now()-t1)/1000);
         $("pMode").textContent = `⚡ ${sp.toFixed(1)}배속 진행 중 — 화면 유지`;
+        $("dimPct").textContent = (f/frames*100).toFixed(0)+"%";
       }
     }
 
@@ -4282,13 +4324,19 @@ async function fastRender(){
       muxer.finalize();
       const blob = new Blob([muxer.target.buffer], {type:"video/mp4"});
       const speed = dur / ((performance.now()-t1)/1000);
-      const playable = await verifyPlayable(blob);   // 이 기기에서 실제 재생 가능한지 검증
+      const playable = await verifyPlayable(blob);   // 영상 트랙 검증
+      const audioOk = playable ? await verifyAudio(blob) : false;   // 오디오 트랙 해부 검사
       endRenderUI();
-      if(playable){
-        showResult(blob, "mp4");
-        toast(`✓ 고속 렌더 완료 — ${speed.toFixed(1)}배속 · ${(blob.size/1048576).toFixed(1)} MB`, 4000);
-      }else{
+      if(!playable){
         disableFast("결과물 재생 불가");
+      }else if(audioOk === false){
+        disableFast("오디오 트랙 생성 실패");
+      }else{
+        showResult(blob, "mp4");
+        if(audioOk === true)
+          toast(`✓ 렌더 완료 (오디오 정상 포함 확인) — ${speed.toFixed(1)}배속 · ${(blob.size/1048576).toFixed(1)} MB`, 4500);
+        else
+          toast(`✓ 렌더 완료 — ${speed.toFixed(1)}배속 (오디오 자동판정 불가 — 재생해 확인하세요)`, 4500);
       }
     }else{
       endRenderUI();
@@ -4401,6 +4449,7 @@ async function startRender(){
     drawFrame(nodes, p);
     $("pFill").style.width = Math.min(100, p*100)+"%";
     $("pTime").textContent = fmtTime(Math.min(dur, ctx.currentTime - t0));
+    $("dimPct").textContent = Math.min(100, p*100).toFixed(0)+"%";
     requestAnimationFrame(loop);
   };
   loop();
@@ -4902,6 +4951,8 @@ function init(){
   $("btnPreview").addEventListener("click", ()=> S.playing ? stopPreview() : startPreview());
   $("btnRender").addEventListener("click", startRender);
   $("btnCancel").addEventListener("click", cancelRender);
+  $("btnDim").addEventListener("click", ()=>{ if(S.rendering) $("dimWrap").classList.add("open"); });
+  $("dimWrap").addEventListener("click", ()=>$("dimWrap").classList.remove("open"));
   $("chipFastR").addEventListener("click", ()=>{
     if(S.rendering) return;
     S.fastRender = !S.fastRender;
