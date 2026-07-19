@@ -354,6 +354,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <div class="row" style="margin-top:8px">
     <button class="btn small" id="btnThumb">🖼 썸네일 저장</button>
     <button class="btn small" id="btnDesc" disabled>📋 유튜브 설명 복사</button>
+    <button class="btn small" id="btnDiag">🔍 진단 복사</button>
   </div>
   <div class="row" style="margin-top:12px">
     <button class="chip on" id="chipFastR">⚡ 고속 렌더</button>
@@ -375,7 +376,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p class="notice" id="renderNote">렌더 중 다른 앱으로 이동하거나 화면을 잠그면 작업이 멈춥니다.</p>
 </section>
 
-<footer>LUMATONE v2.7 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v2.8 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -4167,6 +4168,7 @@ async function verifyAudio(blob){
 // 고속 렌더 호환 문제 확인 시: 이 기기에서 영구 비활성화 + 안내
 function disableFast(reason){
   console.warn("[LUMATONE] 고속 렌더 비활성화:", reason);
+  if(S.diag) S.diag.fail = reason;
   S.fastRender = false;
   fastOK = false;
   $("chipFastR").classList.remove("on");
@@ -4209,6 +4211,10 @@ async function fastRender(){
   if(S.bgMode==="video" && S.bgVideo){ S.bgVideo.currentTime = 0; S.bgVideo.play().catch(()=>{}); }
 
   let ve=null, ae=null, encErr=null;
+  const DG = {mode:"fast", w:W, h:H, sr:projSR, dur:+dur.toFixed(1), tracks:S.tracks.length,
+    codec:null, vChunks:0, aChunks:0, aBytes:0, adts:false, descFrom:null, descHex:null,
+    vVideo:null, vAudio:null, fail:null};
+  S.diag = DG;
   const t1 = performance.now();
   try{
     // 코덱 후보: 애플 하드웨어 인코더 선호 순 (High → Main → Baseline)
@@ -4224,6 +4230,7 @@ async function fastRender(){
       }catch(e){}
     }
     if(!codec) throw new Error("지원되는 H.264 프로파일 없음");
+    DG.codec = codec;
     const muxer = new Mp4Muxer.Muxer({
       target: new Mp4Muxer.ArrayBufferTarget(),
       video: {codec:"avc", width:W, height:H},
@@ -4241,6 +4248,7 @@ async function fastRender(){
           }
           gotDesc = true;
         }
+        DG.vChunks++;
         muxer.addVideoChunk(c,m);
       },
       error:e=>{encErr=e;}
@@ -4255,12 +4263,19 @@ async function fastRender(){
         c.copyTo(buf);
         let data = buf;
         if(buf.length>9 && buf[0]===0xFF && (buf[1]&0xF0)===0xF0){
+          DG.adts = true;
           data = buf.subarray((buf[1]&0x01) ? 7 : 9);   // ADTS 헤더 제거 (MP4는 raw AAC)
         }
+        DG.aChunks++; DG.aBytes += data.length;
         if(audioFirst){
           audioFirst = false;
           let desc = m && m.decoderConfig && m.decoderConfig.description;
+          DG.descFrom = desc ? "encoder" : "synthesized";
           if(!desc) desc = makeAsc(projSR, 2);          // ASC 누락 시 규격대로 생성
+          try{
+            const dv = desc instanceof Uint8Array ? desc : new Uint8Array(desc.buffer || desc);
+            DG.descHex = [...dv.slice(0,8)].map(b=>b.toString(16).padStart(2,"0")).join(" ");
+          }catch(e){ DG.descHex = "?"; }
           muxer.addAudioChunkRaw(data, "key", c.timestamp, c.duration || AAC_DUR,
             {decoderConfig:{codec:"mp4a.40.2", sampleRate:projSR, numberOfChannels:2, description:desc}});
         }else{
@@ -4326,6 +4341,7 @@ async function fastRender(){
       const speed = dur / ((performance.now()-t1)/1000);
       const playable = await verifyPlayable(blob);   // 영상 트랙 검증
       const audioOk = playable ? await verifyAudio(blob) : false;   // 오디오 트랙 해부 검사
+      DG.vVideo = playable; DG.vAudio = audioOk; DG.mb = +(blob.size/1048576).toFixed(1);
       endRenderUI();
       if(!playable){
         disableFast("결과물 재생 불가");
@@ -4461,6 +4477,15 @@ function finishRender(mime){
   if(!S.recChunks.length){ toast("녹화 데이터가 없습니다 — 화면이 꺼졌을 수 있어요", 4000); return; }
   const ext = mime.includes("mp4") ? "mp4" : "webm";
   const blob = new Blob(S.recChunks, {type: mime.split(";")[0]});
+  S.diag = {mode:"realtime", mime, chunks:S.recChunks.length,
+    mb:+(blob.size/1048576).toFixed(1), dur:+S.curDur.toFixed(1),
+    q:S.quality, tracks:S.tracks.length};
+  // 실시간 결과물도 오디오 해부 검사 (비동기 — 결과는 토스트로)
+  verifyAudio(blob).then(ok=>{
+    S.diag.vAudio = ok;
+    if(ok === false) toast("⚠ 실시간 렌더 결과에도 오디오가 감지되지 않습니다 — 🔍 진단 복사를 눌러 전달해주세요", 6000);
+    else if(ok === true) toast("오디오 트랙 정상 포함 확인 ✓ (안 들리면 재생 환경 문제)", 4500);
+  });
   showResult(blob, ext);
   toast("✓ 렌더 완료 (" + (blob.size/1048576).toFixed(1) + " MB)");
 }
@@ -4644,6 +4669,22 @@ function init(){
   });
   $("btnThumb").addEventListener("click", saveThumbnail);
   $("btnDesc").addEventListener("click", copyDescription);
+  $("btnDiag").addEventListener("click", async ()=>{
+    const info = {
+      app: "LUMATONE v2.8",
+      ua: navigator.userAgent,
+      webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
+      fastOK: fastOK,
+      lastRender: S.diag || "렌더 기록 없음",
+    };
+    const txt = JSON.stringify(info, null, 1);
+    try{ await navigator.clipboard.writeText(txt); toast("✓ 진단 정보 복사됨 — 대화창에 붙여넣어 주세요", 3500); }
+    catch(e){
+      const ta=document.createElement("textarea"); ta.value=txt;
+      document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
+      toast("✓ 복사됨");
+    }
+  });
   $("btnDownload").addEventListener("click", e=>{
     e.preventDefault();
     if(!S.lastBlob){ toast("먼저 렌더를 완료하세요"); return; }
