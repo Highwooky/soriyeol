@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="소리결">
+<meta name="apple-mobile-web-app-title" content="LUMATONE">
 <meta name="theme-color" content="#0D1015">
-<title>소리결 — 폰에서 끝내는 뮤직비디오</title>
+<title>LUMATONE — 폰에서 끝내는 뮤직비디오</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='44' fill='%230D1015'/><circle cx='50' cy='50' r='30' fill='none' stroke='%233ECFB2' stroke-width='6'/><circle cx='50' cy='50' r='14' fill='%23E8603C'/></svg>">
 <style>
 :root{
@@ -103,6 +103,13 @@ input[type=text]:focus{border-color:var(--accent)}
   font-size:.85rem;opacity:0;transition:.3s;z-index:99;max-width:90vw;text-align:center;cursor:pointer}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 #previewCanvas.dragmode{touch-action:none;outline:1.5px dashed var(--accent);outline-offset:-1.5px}
+#miniWrap{position:fixed;right:12px;bottom:calc(env(safe-area-inset-bottom) + 14px);z-index:60;
+  border-radius:12px;overflow:hidden;border:1px solid var(--line);
+  box-shadow:0 6px 24px rgba(0,0,0,.55);display:none;background:#000;cursor:pointer}
+#miniWrap.show{display:block}
+#miniCanvas{display:block}
+#miniWrap .minilabel{position:absolute;left:0;right:0;bottom:0;font-size:.58rem;text-align:center;
+  color:#fff;background:rgba(0,0,0,.45);padding:2px 0;pointer-events:none}
 footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-height:1.7}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -111,7 +118,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
 <div class="wrap">
 
 <header>
-  <div class="brand"><h1>소리<em>결</em></h1><span>SORI-GYEOL · MV MAKER</span></div>
+  <div class="brand"><h1>LUMA<em>TONE</em></h1><span>루마톤 · MV MAKER</span></div>
   <p class="tagline">음원 하나로 마스터링부터 비주얼라이저 영상까지, 아이폰 안에서 전부.</p>
 </header>
 
@@ -155,6 +162,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
     <button class="on" data-t="art">생성 아트</button>
     <button data-t="photo">사진</button>
     <button data-t="ai">AI 생성</button>
+    <button data-t="video">동영상</button>
   </div>
   <div class="tabpane on" data-t="art">
     <div class="label">무드</div>
@@ -180,11 +188,25 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
     </div>
     <p id="slideInfo" style="font-size:.72rem;color:var(--sub);margin-top:8px">무료 외부 서비스(Pollinations) · 인터넷 필요 · 실패 시 재시도</p>
   </div>
+  <div class="tabpane" data-t="video">
+    <button class="btn full" id="btnVideo">동영상 선택 (mp4/mov)</button>
+    <input type="file" id="videoInput" accept="video/*" hidden>
+    <p style="font-size:.72rem;color:var(--sub);margin-top:8px;line-height:1.6">Kling·Veo·Pika 등 AI 앱에서 생성해 폰에 저장한 클립을 배경으로 사용하세요. 소리는 제거되고 곡 길이에 맞춰 자동 반복됩니다.</p>
+  </div>
 </section>
 
 <!-- ④ 화면 -->
 <section class="step">
   <div class="step-head"><div class="step-num" id="n4">4</div><h2>화면 구성</h2></div>
+  <div class="label">추천 프리셋 — 원탭으로 조합 적용</div>
+  <div class="chips" id="presetLook">
+    <button class="chip" data-v="cinematic">시네마틱 감성</button>
+    <button class="chip" data-v="neon">네온 EDM</button>
+    <button class="chip" data-v="retro">레트로 LP</button>
+    <button class="chip" data-v="minimal">미니멀</button>
+    <button class="chip" data-v="star">별빛 발라드</button>
+  </div>
+  <div style="margin-top:10px"><button class="btn small" id="btnLookReset">↺ 화면 구성 전체 초기화</button></div>
   <div class="label">비율</div>
   <div class="chips" id="ratioChips">
     <button class="chip on" data-v="169">16:9 유튜브</button>
@@ -198,6 +220,8 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
     <button class="chip" data-v="wave">웨이브폼</button>
     <button class="chip" data-v="burst">파티클</button>
     <button class="chip" data-v="aurora">오로라</button>
+    <button class="chip" data-v="mirror">미러</button>
+    <button class="chip" data-v="orbit">오빗</button>
     <button class="chip" data-v="lp">LP 레코드</button>
     <button class="chip" data-v="dots">별자리</button>
     <button class="chip" data-v="none">없음</button>
@@ -223,11 +247,21 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <input type="text" id="titleInput" placeholder="곡 제목">
   <div class="label">아티스트 / 부제</div>
   <input type="text" id="artistInput" placeholder="아티스트명 (비우면 표시 안 함)">
+  <div class="label">워터마크 — 우상단 표시 (채널명 등)</div>
+  <input type="text" id="wmInput" placeholder="비우면 표시 안 함">
   <div class="label">배경 모션</div>
   <div class="chips">
     <button class="chip on" id="chipKb">켄번즈 줌</button>
     <button class="chip on" id="chipPump">비트 펌핑</button>
     <button class="chip" id="chipMood">무드 시프트</button>
+    <button class="chip" id="chipFlow">아트 흐름</button>
+  </div>
+  <div class="label">색감 톤</div>
+  <div class="chips" id="toneChips">
+    <button class="chip on" data-v="none">기본</button>
+    <button class="chip" data-v="warm">웜</button>
+    <button class="chip" data-v="cool">쿨</button>
+    <button class="chip" data-v="mono">모노</button>
   </div>
   <div class="label">마감 효과</div>
   <div class="chips">
@@ -282,15 +316,16 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p class="notice">렌더는 곡 길이만큼 실시간으로 진행됩니다 (3분 곡 = 약 3분). 진행 중 다른 앱으로 이동하거나 화면을 잠그면 녹화가 멈춥니다.</p>
 </section>
 
-<footer>소리결 v1.3 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)</footer>
+<footer>LUMATONE v1.6 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)</footer>
 </div>
 
+<div id="miniWrap"><canvas id="miniCanvas" width="176" height="99"></canvas><div class="minilabel">탭하면 미리보기로</div></div>
 <div class="toast" id="toast"></div>
 
 <script>
 "use strict";
 /* ============================================================
-   소리결 (Sori-Gyeol) — 폰 단독 뮤직비디오 메이커
+   LUMATONE (루마톤) — 폰 단독 뮤직비디오 메이커
    오디오: Web Audio API (LUFS 측정/노멀라이즈/마스터링/리미터)
    영상:   Canvas + captureStream + MediaRecorder (H.264 mp4 on iOS)
    ============================================================ */
@@ -319,6 +354,9 @@ const S = {
   showText: true, showProg: true, monitor: true,
   kb: true, pump: true, moodShift: false, fade: true, fxOverlay: false,
   dust: false, cine: false, glowBoost: false,
+  tone: "none",            // none | warm | cool | mono
+  artFlow: false,          // 생성 아트 실시간 흐름
+  bgVideo: null,           // 배경 동영상 <video> 엘리먼트
   dragTarget: "off",       // off | viz | text — 미리보기 드래그 대상
   vizPos: {x:0.5, y:0.44}, vizScale: 1.0,
   textPos: {x:0.5, y:0.90}, textScale: 1.0,
@@ -383,7 +421,7 @@ async function selectFont(id){
       await document.fonts.load(`${f.w} 40px ${f.family.split(",")[0]}`);
       loadedFonts.add(id);
     }catch(err){
-      console.warn("[소리결] 폰트 로드 실패:", err);
+      console.warn("[LUMATONE] 폰트 로드 실패:", err);
       toast("폰트를 불러오지 못했습니다 (인터넷 확인) — 기본 고딕 사용", 3000);
       S.font = "gothic";
       drawFrame(null);
@@ -595,7 +633,7 @@ async function processAudio(){
     $("btnRender").disabled = false;
     toast("✓ 마스터링 완료 — " + S.lufsOut.toFixed(1) + " LUFS");
   }catch(err){
-    console.error("[소리결] 오디오 처리 실패:", err);
+    console.error("[LUMATONE] 오디오 처리 실패:", err);
     toast("오디오 처리 실패: " + err.message);
   }finally{
     btn.disabled = false; btn.textContent = "사운드 적용";
@@ -654,27 +692,31 @@ function getGrain(){
   return grainCanvas;
 }
 
-function generateArt(mood, seed, w, h){
+// 생성 아트 페인터 — t(초)를 넣으면 오브가 천천히 유영 (아트 흐름 모드)
+function artPaint(x, w, h, mood, seed, t){
   const cfg = MOODS[mood] || MOODS.dawn;
   const rnd = mulberry32(seed);
-  const c = document.createElement("canvas"); c.width=w; c.height=h;
-  const x = c.getContext("2d");
   // 베이스 그라디언트
   const lg = x.createLinearGradient(0,0,w*0.3,h);
   lg.addColorStop(0,cfg.base[0]); lg.addColorStop(1,cfg.base[1]);
   x.fillStyle = lg; x.fillRect(0,0,w,h);
-  // 오브 (부드러운 방사형 광원) — 블러 필터 없이 그라디언트만으로 (iOS 호환)
+  // 오브 파라미터를 먼저 전부 뽑아 시드 순서를 고정 → t와 무관하게 동일 구도
   const nOrb = 6 + Math.floor(rnd()*5);
+  const orbs = [];
   for(let i=0;i<nOrb;i++){
-    const ox = rnd()*w, oy = rnd()*h;
-    const r = (0.18 + rnd()*0.4) * Math.max(w,h);
-    const col = cfg.orbs[Math.floor(rnd()*cfg.orbs.length)];
-    const rg = x.createRadialGradient(ox,oy,0,ox,oy,r);
-    rg.addColorStop(0, col + "66");
-    rg.addColorStop(1, col + "00");
+    orbs.push({bx:rnd(), by:rnd(), r:(0.18+rnd()*0.4)*Math.max(w,h),
+      col:cfg.orbs[Math.floor(rnd()*cfg.orbs.length)],
+      ph:rnd()*Math.PI*2, spd:0.05+rnd()*0.08, amp:0.03+rnd()*0.04});
+  }
+  for(const o of orbs){
+    const ox = (o.bx + Math.sin(t*o.spd + o.ph)*o.amp)*w;
+    const oy = (o.by + Math.cos(t*o.spd*0.8 + o.ph)*o.amp)*h;
+    const rg = x.createRadialGradient(ox,oy,0,ox,oy,o.r);
+    rg.addColorStop(0, o.col + "66");
+    rg.addColorStop(1, o.col + "00");
     x.globalCompositeOperation = (mood==="ink") ? "multiply" : "lighter";
     x.fillStyle = rg;
-    x.beginPath(); x.arc(ox,oy,r,0,Math.PI*2); x.fill();
+    x.beginPath(); x.arc(ox,oy,o.r,0,Math.PI*2); x.fill();
   }
   x.globalCompositeOperation = "source-over";
   // 비네트
@@ -686,6 +728,11 @@ function generateArt(mood, seed, w, h){
   x.fillStyle = x.createPattern(getGrain(),"repeat");
   x.fillRect(0,0,w,h);
   x.globalAlpha = 1;
+}
+
+function generateArt(mood, seed, w, h){
+  const c = document.createElement("canvas"); c.width=w; c.height=h;
+  artPaint(c.getContext("2d"), w, h, mood, seed, 0);
   return c;
 }
 
@@ -736,11 +783,11 @@ async function loadAiImage(append){
       }catch(err){
         clearTimeout(timer);
         lastErr = err;
-        console.warn(`[소리결] AI 이미지 시도 ${attempt} 실패:`, err.message);
+        console.warn(`[LUMATONE] AI 이미지 시도 ${attempt} 실패:`, err.message);
       }
     }
     // 전 시도 실패
-    console.error("[소리결] AI 이미지 최종 실패:", lastErr);
+    console.error("[LUMATONE] AI 이미지 최종 실패:", lastErr);
     info.textContent = "생성 실패 — 네트워크 확인 후 재시도하거나 생성 아트를 사용하세요";
     toast("이미지 생성 실패 (탭해서 닫기)", 2500);
   }finally{
@@ -844,24 +891,44 @@ function drawKb(x, img, w, h, lp, seed, extraZoom, alpha){
   x.drawImage(img, ox, oy, dw, dh);
   x.globalAlpha = 1;
 }
-function drawBackground(x, w, h, progress){
-  const slides = S.slides;
-  if(!slides.length){ x.fillStyle="#0D1015"; x.fillRect(0,0,w,h); return; }
+function drawBackground(x, w, h, progress, tSec){
   const pumpZ = S.pump ? 1 + S.beatPulse*0.035 : 1;
-  const n = slides.length;
-  if(n === 1){
-    drawKb(x, slides[0], w, h, progress, S.kbSeeds[0]||1, pumpZ, 1);
-  }else{
-    const pos = Math.min(0.9999, progress) * n;
-    const idx = Math.floor(pos), local = pos - idx;
-    const FADE = 0.18;   // 각 슬라이드 말미 18% 구간에서 크로스페이드
-    drawKb(x, slides[idx], w, h, local, S.kbSeeds[idx]||1, pumpZ, 1);
-    if(local > 1-FADE && idx+1 < n){
-      drawKb(x, slides[idx+1], w, h, 0, S.kbSeeds[idx+1]||1, pumpZ, (local-(1-FADE))/FADE);
+  // ① 동영상 배경 (자동 반복, 커버 핏)
+  if(S.bgMode==="video" && S.bgVideo && S.bgVideo.readyState >= 2){
+    const v = S.bgVideo;
+    const iw = v.videoWidth, ih = v.videoHeight;
+    if(iw && ih){
+      const s = Math.max(w/iw, h/ih) * pumpZ;
+      const dw = iw*s, dh = ih*s;
+      x.drawImage(v, (w-dw)/2, (h-dh)/2, dw, dh);
     }
   }
+  // ② 아트 흐름 (생성 아트를 매 프레임 유영시켜 그림 — 오프라인 동적 배경)
+  else if(S.bgMode==="art" && S.artFlow){
+    artPaint(x, w, h, S.mood, S.artSeed, tSec*0.6);
+    if(S.pump && pumpZ > 1.001){
+      // 펌핑은 아트 흐름에선 밝기 펄스로만 (줌 재계산 비용 절약)
+    }
+  }
+  // ③ 정적 슬라이드 (켄번즈 + 크로스페이드)
+  else{
+    const slides = S.slides;
+    if(!slides.length){ x.fillStyle="#0D1015"; x.fillRect(0,0,w,h); return; }
+    const n = slides.length;
+    if(n === 1){
+      drawKb(x, slides[0], w, h, progress, S.kbSeeds[0]||1, pumpZ, 1);
+    }else{
+      const pos = Math.min(0.9999, progress) * n;
+      const idx = Math.floor(pos), local = pos - idx;
+      const FADE = 0.18;   // 각 슬라이드 말미 18% 구간에서 크로스페이드
+      drawKb(x, slides[idx], w, h, local, S.kbSeeds[idx]||1, pumpZ, 1);
+      if(local > 1-FADE && idx+1 < n){
+        drawKb(x, slides[idx+1], w, h, 0, S.kbSeeds[idx+1]||1, pumpZ, (local-(1-FADE))/FADE);
+      }
+    }
+  }
+  // ---------- 공통 오버레이 ----------
   if(S.moodShift){
-    // 곡 진행에 따라 색조가 서서히 순환 (soft-light라 원본을 해치지 않음)
     const hue = (190 + 200*progress) % 360;
     x.globalCompositeOperation = "soft-light";
     x.fillStyle = `hsla(${hue.toFixed(0)},70%,55%,0.33)`;
@@ -871,6 +938,23 @@ function drawBackground(x, w, h, progress){
   if(S.pump && S.beatPulse > 0.03){
     x.globalCompositeOperation = "soft-light";
     x.fillStyle = `rgba(255,255,255,${(S.beatPulse*0.25).toFixed(3)})`;
+    x.fillRect(0,0,w,h);
+    x.globalCompositeOperation = "source-over";
+  }
+  // 색감 톤 (블렌드 모드 — iOS 캔버스 지원 범위 내)
+  if(S.tone === "warm"){
+    x.globalCompositeOperation = "soft-light";
+    x.fillStyle = "rgba(255,140,77,0.30)";
+    x.fillRect(0,0,w,h);
+    x.globalCompositeOperation = "source-over";
+  }else if(S.tone === "cool"){
+    x.globalCompositeOperation = "soft-light";
+    x.fillStyle = "rgba(77,125,255,0.30)";
+    x.fillRect(0,0,w,h);
+    x.globalCompositeOperation = "source-over";
+  }else if(S.tone === "mono"){
+    x.globalCompositeOperation = "saturation";
+    x.fillStyle = "#808080";
     x.fillRect(0,0,w,h);
     x.globalCompositeOperation = "source-over";
   }
@@ -925,7 +1009,7 @@ function drawFrame(audio, progress){
     const dy = (S.vizPos.y - 0.44) * h;
     const GB = S.glowBoost ? 2.2 : 1;
 
-    drawBackground(x, w, h, p===null ? 0 : p);
+    drawBackground(x, w, h, p===null ? 0 : p, tSec);
 
     // 가독성 오버레이
     const og = x.createLinearGradient(0,h*0.55,0,h);
@@ -957,6 +1041,57 @@ function drawFrame(audio, progress){
         if(px===0) x.moveTo(0,y); else x.lineTo(px*(w/(wave.length/step)),y);
       }
       x.stroke();
+    }
+    else if(S.viz==="mirror" && freq){
+      // 미러 스펙트럼 — 중앙선 기준 상하 대칭, 프리미엄 심메트리 룩
+      const n=56, bw = w/n*0.55, gap = w/n*0.45;
+      const lv = bandLevels(freq, n);
+      const yMid = h*S.vizPos.y;
+      x.shadowColor = S.accent; x.shadowBlur = h*0.012*GB;
+      for(let i=0;i<n;i++){
+        const v = Math.min(1, lv[i]*S.sens);
+        const bh = Math.max(h*0.004, v*v*h*0.22*VS);
+        const bx2 = i*(bw+gap)+gap/2;
+        x.fillStyle = S.accent;
+        x.globalAlpha = 0.95;
+        x.fillRect(bx2, yMid-bh, bw, bh);       // 위
+        x.globalAlpha = 0.35;
+        x.fillRect(bx2, yMid, bw, bh);          // 아래(반사)
+      }
+      x.globalAlpha = 1;
+      x.fillStyle = S.accent;
+      x.globalAlpha = 0.5;
+      x.fillRect(0, yMid-Math.max(1,h*0.001), w, Math.max(2,h*0.002));  // 중앙선
+      x.globalAlpha = 1;
+    }
+    else if(S.viz==="orbit"){
+      // 오빗 — 궤도를 도는 발광 입자 3링, 대역 에너지에 따라 궤도가 부풂
+      const cx=w*S.vizPos.x, cy=h*S.vizPos.y;
+      x.fillStyle = S.accent;
+      x.shadowColor = S.accent; x.shadowBlur = mn*0.012*GB;
+      x.strokeStyle = S.accent;
+      for(let ring=0; ring<3; ring++){
+        const baseR = mn*(0.10 + ring*0.075)*VS;
+        const cnt = 16 + ring*6;
+        const dir = (ring%2 ? -1 : 1);
+        const spd = (0.25 + ring*0.18)*(1 + bass*0.8);
+        // 궤도선 (희미하게)
+        x.globalAlpha = 0.08;
+        x.lineWidth = Math.max(1, mn*0.0015);
+        x.beginPath(); x.arc(cx, cy, baseR, 0, Math.PI*2); x.stroke();
+        x.globalAlpha = 1;
+        for(let i=0;i<cnt;i++){
+          const b = S.smoothBands[(i*4 + ring*7) % 64];
+          const ang = i/cnt*Math.PI*2 + tSec*spd*dir + ring*0.7;
+          const rad = baseR*(1 + b*0.35);
+          const px = cx + Math.cos(ang)*rad;
+          const py = cy + Math.sin(ang)*rad;
+          const r = mn*0.0032*(0.6 + b*2.4)*VS;
+          x.globalAlpha = 0.55 + b*0.45;
+          x.beginPath(); x.arc(px, py, r, 0, Math.PI*2); x.fill();
+        }
+      }
+      x.globalAlpha = 1;
     }
     else if(S.viz==="ring"){
       const cx=w*S.vizPos.x, cy=h*S.vizPos.y;
@@ -1120,6 +1255,19 @@ function drawFrame(audio, progress){
         x.shadowBlur=0; x.shadowOffsetY=0;
       }
     }
+    // ---------- 워터마크 (우상단) ----------
+    {
+      const wm = $("wmInput").value.trim();
+      if(wm){
+        x.textAlign = "right";
+        x.fillStyle = "rgba(255,255,255,0.55)";
+        x.shadowColor = "rgba(0,0,0,.5)"; x.shadowBlur = h*0.005;
+        x.font = `600 ${Math.round(h*0.024)}px -apple-system,"Apple SD Gothic Neo",sans-serif`;
+        x.fillText(wm, w*0.97, h*(S.cine ? 0.095+0.045 : 0.06));   // 시네마 바 아래로
+        x.shadowBlur = 0;
+        x.textAlign = "center";
+      }
+    }
     // ---------- 진행바 ----------
     if(S.showProg && p !== null){
       x.fillStyle="rgba(255,255,255,.18)";
@@ -1174,6 +1322,12 @@ function drawFrame(audio, progress){
         x.fillRect(0,0,w,h);
       }
     }
+  }
+  // ---------- 플로팅 미니 미리보기 (본 미리보기가 화면 밖일 때) ----------
+  const miniWrap = $("miniWrap");
+  if(miniWrap && miniWrap.classList.contains("show")){
+    const mini = $("miniCanvas");
+    mini.getContext("2d").drawImage(pv, 0, 0, mini.width, mini.height);
   }
 }
 
@@ -1230,6 +1384,7 @@ function stopPreview(){
 }
 function startPreview(){
   if(S.rendering) return;
+  if(S.bgMode==="video" && S.bgVideo) S.bgVideo.play().catch(()=>{});
   const nodes = makePlayNodes(true);
   S.playNodes = nodes; S.playing = true;
   const t0 = getCtx().currentTime;
@@ -1311,6 +1466,7 @@ async function startRender(){
   S.rendering = true;
 
   recorder.start(1000);
+  if(S.bgMode==="video" && S.bgVideo){ S.bgVideo.currentTime = 0; S.bgVideo.play().catch(()=>{}); }
   const t0 = ctx.currentTime;
   scheduleFade(fade, ctx, t0, dur);
   src.start();
@@ -1375,9 +1531,10 @@ function bindChips(elId, cb){
 
 function setRatioCanvas(){
   const pv = $("previewCanvas");
-  if(S.ratio==="916"){ pv.width=540; pv.height=960; }
-  else if(S.ratio==="11"){ pv.width=720; pv.height=720; }
-  else { pv.width=960; pv.height=540; }
+  const mini = $("miniCanvas");
+  if(S.ratio==="916"){ pv.width=540; pv.height=960; mini.width=84;  mini.height=149; }
+  else if(S.ratio==="11"){ pv.width=720; pv.height=720; mini.width=118; mini.height=118; }
+  else { pv.width=960; pv.height=540; mini.width=176; mini.height=99; }
   if(S.bgMode==="art") refreshArt(false);
   else drawFrame(null);
 }
@@ -1407,7 +1564,7 @@ async function onAudioFile(file){
     drawFrame(null);
     toast("✓ 로드 완료 — 원본 " + S.lufsIn.toFixed(1) + " LUFS");
   }catch(err){
-    console.error("[소리결] 디코딩 실패:", err);
+    console.error("[LUMATONE] 디코딩 실패:", err);
     toast("이 파일을 읽을 수 없습니다: " + err.message, 4000);
   }
 }
@@ -1456,7 +1613,29 @@ function init(){
     S.bgMode = b.dataset.t;
     for(const p of document.querySelectorAll(".tabpane"))
       p.classList.toggle("on", p.dataset.t===S.bgMode);
+    // 동영상은 해당 모드에서만 재생 (배터리 절약)
+    if(S.bgVideo){
+      if(S.bgMode==="video") S.bgVideo.play().catch(()=>{});
+      else S.bgVideo.pause();
+    }
     if(S.bgMode==="art") refreshArt(false);
+    else drawFrame(null);
+  });
+  $("btnVideo").addEventListener("click", ()=>$("videoInput").click());
+  $("videoInput").addEventListener("change", e=>{
+    const f = e.target.files[0]; if(!f) return;
+    if(S.bgVideo){ S.bgVideo.pause(); URL.revokeObjectURL(S.bgVideo.src); }
+    const v = document.createElement("video");
+    v.muted = true; v.loop = true; v.playsInline = true;
+    v.setAttribute("playsinline","");
+    v.src = URL.createObjectURL(f);
+    v.addEventListener("loadeddata", ()=>{
+      v.play().catch(()=>{});
+      drawFrame(null);
+      toast("✓ 동영상 배경 적용 — 자동 반복");
+    }, {once:true});
+    v.onerror = ()=>toast("동영상을 열 수 없습니다 (mp4/mov 권장)");
+    S.bgVideo = v;
   });
   bindChips("moodChips", v=>{ S.mood=v; refreshArt(true); });
   $("btnReart").addEventListener("click", ()=>refreshArt(true));
@@ -1499,6 +1678,86 @@ function init(){
   toggle("chipDust","dust");
   toggle("chipCine","cine");
   toggle("chipGlow","glowBoost");
+  toggle("chipFlow","artFlow");
+  bindChips("toneChips", v=>{ S.tone=v; if(!S.playing && !S.rendering) drawFrame(null); });
+  $("wmInput").addEventListener("input", ()=>{ if(!S.playing && !S.rendering) drawFrame(null); });
+
+  // ---------- 추천 프리셋 (원탭 룩) ----------
+  const LOOKS = {
+    cinematic:{viz:"aurora", mood:"dawn",    accent:"#D9B36C", tone:"warm",
+      set:{kb:1,pump:0,moodShift:0,fade:1,fxOverlay:1,dust:1,cine:1,glowBoost:0,artFlow:0}},
+    neon:     {viz:"burst",  mood:"neon",    accent:"#3ECFB2", tone:"cool",
+      set:{kb:0,pump:1,moodShift:1,fade:1,fxOverlay:0,dust:0,cine:0,glowBoost:1,artFlow:1}},
+    retro:    {viz:"lp",     mood:"dusk",    accent:"#E8603C", tone:"warm",
+      set:{kb:1,pump:0,moodShift:0,fade:1,fxOverlay:1,dust:1,cine:0,glowBoost:0,artFlow:0}},
+    minimal:  {viz:"ring",   mood:"celadon", accent:"#F2F2F2", tone:"none",
+      set:{kb:1,pump:0,moodShift:0,fade:1,fxOverlay:0,dust:0,cine:0,glowBoost:0,artFlow:0}},
+    star:     {viz:"dots",   mood:"dawn",    accent:"#5B8CFF", tone:"cool",
+      set:{kb:1,pump:0,moodShift:0,fade:1,fxOverlay:0,dust:1,cine:0,glowBoost:1,artFlow:0}},
+  };
+  const TOGGLE_IDS = {kb:"chipKb",pump:"chipPump",moodShift:"chipMood",fade:"chipFade",
+    fxOverlay:"chipFx",dust:"chipDust",cine:"chipCine",glowBoost:"chipGlow",artFlow:"chipFlow"};
+  const syncChip = (groupId, val)=>{
+    for(const c of $(groupId).querySelectorAll(".chip")) c.classList.toggle("on", c.dataset.v===val);
+  };
+  bindChips("presetLook", id=>{
+    const L = LOOKS[id]; if(!L) return;
+    S.viz = L.viz;       syncChip("vizChips", L.viz);
+    S.tone = L.tone;     syncChip("toneChips", L.tone);
+    S.accent = L.accent;
+    for(const el of $("swatches").querySelectorAll(".sw"))
+      el.classList.toggle("on", el.dataset.v===L.accent);
+    for(const k in L.set){
+      S[k] = !!L.set[k];
+      $(TOGGLE_IDS[k]).classList.toggle("on", S[k]);
+    }
+    if(S.bgMode==="art"){ S.mood = L.mood; syncChip("moodChips", L.mood); refreshArt(true); }
+    else drawFrame(null);
+    toast("✓ 프리셋 적용됨 — 미리듣기로 확인해보세요");
+  });
+
+  // ---------- 화면 구성 전체 초기화 ----------
+  const LOOK_DEFAULTS = {
+    viz:"ring", tone:"none", accent:"#3ECFB2", mood:"dawn", font:"gothic", sens:1.0,
+    set:{kb:1,pump:1,moodShift:0,fade:1,fxOverlay:0,dust:0,cine:0,glowBoost:0,artFlow:0},
+  };
+  $("btnLookReset").addEventListener("click", ()=>{
+    const D = LOOK_DEFAULTS;
+    S.viz = D.viz;   syncChip("vizChips", D.viz);
+    S.tone = D.tone; syncChip("toneChips", D.tone);
+    S.font = D.font; syncChip("fontChips", D.font);
+    S.accent = D.accent;
+    for(const el of $("swatches").querySelectorAll(".sw"))
+      el.classList.toggle("on", el.dataset.v===D.accent);
+    for(const k in D.set){
+      S[k] = !!D.set[k];
+      $(TOGGLE_IDS[k]).classList.toggle("on", S[k]);
+    }
+    S.sens = D.sens;
+    $("sensRange").value = 1; $("sensLabel").textContent = "1.0×";
+    // 배치도 함께 초기화
+    S.vizPos = {x:0.5, y:0.44}; S.vizScale = 1;
+    S.textPos = {x:0.5, y:0.90}; S.textScale = 1;
+    S.dragTarget = "off"; syncChip("dragChips", "off");
+    $("previewCanvas").classList.remove("dragmode");
+    $("vscaleRange").value = 1; $("vscaleLabel").textContent = "100%";
+    $("tscaleRange").value = 1; $("tscaleLabel").textContent = "100%";
+    for(const c of $("presetLook").querySelectorAll(".chip")) c.classList.remove("on");
+    if(S.bgMode==="art"){ S.mood = D.mood; syncChip("moodChips", D.mood); refreshArt(true); }
+    else drawFrame(null);
+    toast("↺ 화면 구성이 기본값으로 초기화되었습니다");
+  });
+
+  // ---------- 플로팅 미니 미리보기: 본 미리보기가 안 보일 때만 표시 ----------
+  const io = new IntersectionObserver(entries=>{
+    const visible = entries[0].isIntersecting;
+    $("miniWrap").classList.toggle("show", !visible);
+    if(!visible && !S.playing && !S.rendering) drawFrame(null);   // 표시 직후 1회 갱신
+  }, {threshold: 0.12});
+  io.observe(document.querySelector(".previewbox"));
+  $("miniWrap").addEventListener("click", ()=>{
+    document.querySelector(".previewbox").scrollIntoView({behavior:"smooth", block:"center"});
+  });
 
   // ---------- 배치 조정: 미리보기 드래그 ----------
   bindChips("dragChips", v=>{
@@ -1560,7 +1819,7 @@ function init(){
 
   document.addEventListener("visibilitychange", ()=>{
     // iOS: 백그라운드 전환 시 rAF/녹화 중단 → 사용자에게 고지
-    if(document.hidden && S.rendering) console.warn("[소리결] 렌더 중 백그라운드 전환 감지");
+    if(document.hidden && S.rendering) console.warn("[LUMATONE] 렌더 중 백그라운드 전환 감지");
   });
 
   refreshArt(false);
