@@ -53,6 +53,13 @@ header{padding:26px 0 10px}
 .dropzone strong{color:var(--text)}
 .filemeta{display:none;margin-top:10px;background:var(--surface2);border-radius:12px;padding:12px;font-size:.82rem;line-height:1.6}
 .filemeta b{color:var(--accent)}
+.trow{display:flex;align-items:center;gap:6px;margin-top:6px}
+.trow .tno{width:18px;color:var(--sub);font-size:.72rem;flex:none;text-align:center}
+.trow .ttitle{flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;
+  color:var(--text);padding:7px 8px;font-size:.78rem;font-family:inherit;outline:none}
+.trow .tdur{color:var(--sub);font-size:.7rem;flex:none}
+.trow .tbtn{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--sub);
+  border-radius:8px;width:26px;height:26px;font-size:.7rem;cursor:pointer;font-family:inherit}
 
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .label{font-size:.75rem;color:var(--sub);margin:14px 0 6px;letter-spacing:.06em}
@@ -125,8 +132,8 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
 <!-- ① 음원 -->
 <section class="step">
   <div class="step-head"><div class="step-num" id="n1">1</div><h2>음원 불러오기</h2><small>MP3 / WAV / M4A</small></div>
-  <div class="dropzone" id="dropzone"><strong>탭해서 음원 선택</strong><br>Suno에서 받은 파일 그대로 OK</div>
-  <input type="file" id="audioInput" accept="audio/*,.mp3,.wav,.m4a,.aac,.flac" hidden>
+  <div class="dropzone" id="dropzone"><strong>탭해서 음원 선택</strong><br>여러 곡 선택하면 플리 영상 + 유튜브 챕터 자동 생성</div>
+  <input type="file" id="audioInput" accept="audio/*,.mp3,.wav,.m4a,.aac,.flac" multiple hidden>
   <div class="filemeta" id="fileMeta"></div>
 </section>
 
@@ -302,6 +309,10 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
     <div style="margin-left:auto"></div>
     <button class="btn small" id="qBtn" data-v="1080">화질 1080p</button>
   </div>
+  <div class="row" style="margin-top:8px">
+    <button class="btn small" id="btnThumb">🖼 썸네일 저장</button>
+    <button class="btn small" id="btnDesc" disabled>📋 유튜브 설명 복사</button>
+  </div>
   <button class="btn hot full" id="btnRender" style="margin-top:12px" disabled>● 영상 렌더 시작</button>
   <div class="progresswrap" id="progressWrap">
     <div class="pbar"><div id="pFill"></div></div>
@@ -316,7 +327,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p class="notice">렌더는 곡 길이만큼 실시간으로 진행됩니다 (3분 곡 = 약 3분). 진행 중 다른 앱으로 이동하거나 화면을 잠그면 녹화가 멈춥니다.</p>
 </section>
 
-<footer>LUMATONE v1.6 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)</footer>
+<footer>LUMATONE v1.7 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)</footer>
 </div>
 
 <div id="miniWrap"><canvas id="miniCanvas" width="176" height="99"></canvas><div class="minilabel">탭하면 미리보기로</div></div>
@@ -333,8 +344,11 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
 // ---------- 전역 상태 ----------
 const S = {
   ctx: null,               // AudioContext (사용자 제스처 후 생성)
-  rawBuffer: null,         // 원본 AudioBuffer
-  procBuffer: null,        // 마스터링 완료 AudioBuffer
+  tracks: [],              // [{name, title, raw, proc, lufsIn}] — 1곡=싱글, 2곡+=플리 모드
+  trackOffsets: [],        // 각 트랙 시작 시각(초, 누적)
+  totalDur: 0,
+  rawBuffer: null,         // (싱글 모드 호환) 원본 AudioBuffer
+  procBuffer: null,        // (싱글 모드 호환) 마스터링 완료 AudioBuffer
   fileName: "",
   preset: "clean",
   targetLUFS: -14,
@@ -388,6 +402,26 @@ function getCtx(){
   if(S.ctx.state === "suspended") S.ctx.resume();
   return S.ctx;
 }
+
+// ---------- 설정 자동 저장 (실패해도 조용히 무시되는 안전 래퍼) ----------
+const store = {
+  get(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
+};
+function saveLook(){
+  store.set("lumatone.look", {
+    preset:S.preset, targetLUFS:S.targetLUFS, amount:S.amount,
+    viz:S.viz, tone:S.tone, accent:S.accent, mood:S.mood, font:S.font, sens:S.sens,
+    ratio:S.ratio, quality:S.quality,
+    kb:S.kb, pump:S.pump, moodShift:S.moodShift, fade:S.fade, fxOverlay:S.fxOverlay,
+    dust:S.dust, cine:S.cine, glowBoost:S.glowBoost, artFlow:S.artFlow,
+    vizPos:S.vizPos, vizScale:S.vizScale, textPos:S.textPos, textScale:S.textScale,
+    artist: $("artistInput") ? $("artistInput").value : "",
+    wm: $("wmInput") ? $("wmInput").value : "",
+  });
+}
+let saveT = null;
+function scheduleSave(){ clearTimeout(saveT); saveT = setTimeout(saveLook, 900); }
 
 // ---------- 시드 난수 (생성 아트 재현용) ----------
 function mulberry32(a){
@@ -594,44 +628,86 @@ function normalizeTo(buffer, targetLUFS){
   return out;
 }
 
+// 트랙 경계 클릭 노이즈 방지: 양 끝단 짧은 페이드
+function edgeFade(buffer, sec){
+  const n = Math.min(buffer.length, Math.round(sec*buffer.sampleRate));
+  for(let c=0;c<buffer.numberOfChannels;c++){
+    const d = buffer.getChannelData(c);
+    for(let i=0;i<n;i++){
+      const g = i/n;
+      d[i] *= g;
+      d[buffer.length-1-i] *= g;
+    }
+  }
+}
+
+function recalcOffsets(){
+  S.trackOffsets = []; S.totalDur = 0;
+  for(const t of S.tracks){
+    S.trackOffsets.push(S.totalDur);
+    S.totalDur += (t.proc || t.raw).duration;
+  }
+}
+
+async function masterOne(buf){
+  let rendered = buf;
+  if(S.preset !== "off"){
+    const off = new OfflineAudioContext(buf.numberOfChannels, buf.length, buf.sampleRate);
+    const src = off.createBufferSource(); src.buffer = buf;
+    buildChain(off, src, S.preset, S.amount);
+    src.start();
+    rendered = await off.startRendering();
+  }
+  return normalizeTo(rendered, S.targetLUFS);
+}
+
 async function processAudio(){
-  if(!S.rawBuffer) return;
-  const btn = $("btnProcess"); btn.disabled = true; btn.textContent = "처리 중…";
-  await new Promise(r=>setTimeout(r,30)); // UI 갱신 여유
+  if(!S.tracks.length) return;
+  const btn = $("btnProcess"); btn.disabled = true;
+  const many = S.tracks.length > 1;
   try{
-    const buf = S.rawBuffer;
-    let rendered = buf;
-    if(S.preset !== "off"){
-      const off = new OfflineAudioContext(buf.numberOfChannels, buf.length, buf.sampleRate);
-      const src = off.createBufferSource(); src.buffer = buf;
-      buildChain(off, src, S.preset, S.amount);
-      src.start();
-      rendered = await off.startRendering();
+    let lufsSum = 0, pkMax = 0;
+    for(let i=0;i<S.tracks.length;i++){
+      const t = S.tracks[i];
+      btn.textContent = many ? `처리 중… (${i+1}/${S.tracks.length})` : "처리 중…";
+      await new Promise(r=>setTimeout(r,30));   // UI 갱신 여유
+      const out = await masterOne(t.raw);
+      edgeFade(out, 0.012);
+      t.proc = out;
+      const lo = measureLUFS(out); lufsSum += lo;
+      for(let c=0;c<out.numberOfChannels;c++){
+        const ch = out.getChannelData(c);
+        for(let s=0;s<ch.length;s++){ const a=Math.abs(ch[s]); if(a>pkMax) pkMax=a; }
+      }
+      if(many) t.raw = null;   // 플리: 원본 즉시 해제 (아이폰 메모리 보호)
     }
-    // 노멀라이즈 (마스터) + A/B 비교용 원본 매칭 버퍼 (같은 음량에서 순수 음색 차이만 비교)
-    const out = normalizeTo(rendered, S.targetLUFS);
-    S.procBuffer = out;
-    S.rawMatched = (S.preset !== "off") ? normalizeTo(buf, S.targetLUFS) : out;
-    S.abOriginal = false;
-    $("btnAB").style.display = (S.preset !== "off") ? "inline-flex" : "none";
-    $("btnAB").textContent = "A/B: 마스터";
-    $("btnAB").classList.remove("hot");
-    S.lufsOut = measureLUFS(out);
-    let pk = 0;
-    for(let c=0;c<out.numberOfChannels;c++){
-      const ch = out.getChannelData(c);
-      for(let i=0;i<ch.length;i++){ const a=Math.abs(ch[i]); if(a>pk) pk=a; }
+    recalcOffsets();
+    // A/B 비교는 싱글 모드에서만 (플리는 메모리상 원본 미보관)
+    if(!many){
+      S.procBuffer = S.tracks[0].proc;
+      S.rawMatched = (S.preset !== "off") ? normalizeTo(S.tracks[0].raw, S.targetLUFS) : S.procBuffer;
+      S.abOriginal = false;
+      $("btnAB").style.display = (S.preset !== "off") ? "inline-flex" : "none";
+      $("btnAB").textContent = "A/B: 마스터";
+      $("btnAB").classList.remove("hot");
+    }else{
+      S.procBuffer = null; S.rawMatched = null;
+      $("btnAB").style.display = "none";
     }
-    S.peakOut = db(pk);
+    S.lufsOut = lufsSum / S.tracks.length;
+    S.peakOut = db(pkMax);
     $("mLufsOut").textContent = S.lufsOut.toFixed(1);
     $("mLufsOut").className = "v ok";
     $("mPeak").textContent = S.peakOut.toFixed(1);
     $("mPeak").className = "v " + (S.peakOut <= -0.8 ? "ok" : "warn");
     $("n2").classList.add("done");
-    $("btnWav").disabled = false;
+    $("btnWav").disabled = many;
     $("btnPreview").disabled = false;
     $("btnRender").disabled = false;
-    toast("✓ 마스터링 완료 — " + S.lufsOut.toFixed(1) + " LUFS");
+    renderTrackList();
+    toast(many
+      ? `✓ ${S.tracks.length}곡 마스터링 완료 — 총 ${fmtTime(S.totalDur)}`
+      : "✓ 마스터링 완료 — " + S.lufsOut.toFixed(1) + " LUFS");
   }catch(err){
     console.error("[LUMATONE] 오디오 처리 실패:", err);
     toast("오디오 처리 실패: " + err.message);
@@ -1237,7 +1313,18 @@ function drawFrame(audio, progress){
 
     // ---------- 텍스트 ----------
     if(S.showText){
-      const title = $("titleInput").value.trim() || S.fileName.replace(/\.[^.]+$/,"");
+      let title;
+      if(S.tracks.length > 1 && p !== null && S.totalDur > 0){
+        // 플리 모드: 현재 재생 중인 트랙 제목을 자동 표시
+        const el = Math.min(S.totalDur - 0.01, p * S.totalDur);
+        let ti = 0;
+        for(let i=0;i<S.trackOffsets.length;i++) if(el >= S.trackOffsets[i]) ti = i;
+        title = S.tracks[ti].title;
+      }else{
+        title = $("titleInput").value.trim()
+          || (S.tracks[0] && S.tracks[0].title)
+          || S.fileName.replace(/\.[^.]+$/,"");
+      }
       const artist = $("artistInput").value.trim();
       if(title){
         const F = FONTS.find(f=>f.id===S.font) || FONTS[0];
@@ -1329,6 +1416,8 @@ function drawFrame(audio, progress){
     const mini = $("miniCanvas");
     mini.getContext("2d").drawImage(pv, 0, 0, mini.width, mini.height);
   }
+  // 유휴 상태의 설정 변경을 자동 저장 (모든 UI 변경은 drawFrame(null)을 거침)
+  if(!S.playing && !S.rendering) scheduleSave();
 }
 
 // ---------- 미리듣기 ----------
@@ -1343,15 +1432,20 @@ function scheduleFade(fadeNode, ctx, t0, dur){
 
 function makePlayNodes(monitorOn){
   const ctx = getCtx();
-  const src = ctx.createBufferSource();
-  src.buffer = S.procBuffer || S.rawBuffer;
   const gMain = ctx.createGain();
   gMain.gain.value = S.abOriginal ? 0 : 1;
   const sum = ctx.createGain();
-  src.connect(gMain); gMain.connect(sum);
-  // A/B 비교: 원본(음량 매칭) 버퍼를 동시에 재생하고 게인만 전환 → 끊김 없는 비교
+  // 트랙별 소스 — 타임라인 오프셋 스케줄로 갭리스 이어재생 (거대 버퍼 병합 불필요)
+  const srcs = S.tracks.map(t=>{
+    const s = ctx.createBufferSource();
+    s.buffer = t.proc || t.raw;
+    s.connect(gMain);
+    return s;
+  });
+  gMain.connect(sum);
+  // A/B 비교 (싱글 모드 전용): 원본 매칭 버퍼 동시 재생, 게인만 전환
   let srcAB = null, gAB = null;
-  if(S.rawMatched && S.rawMatched !== S.procBuffer){
+  if(S.tracks.length===1 && S.rawMatched && S.rawMatched !== S.procBuffer){
     srcAB = ctx.createBufferSource();
     srcAB.buffer = S.rawMatched;
     gAB = ctx.createGain();
@@ -1367,14 +1461,23 @@ function makePlayNodes(monitorOn){
   fade.connect(analyser);
   analyser.connect(gain);
   gain.connect(ctx.destination);
-  return {src, srcAB, gMain, gAB, analyser, gain, fade};
+  return {srcs, srcAB, gMain, gAB, analyser, gain, fade};
+}
+function startAll(nodes, t0){
+  recalcOffsets();
+  nodes.srcs.forEach((s,i)=>s.start(t0 + S.trackOffsets[i]));
+  if(nodes.srcAB) nodes.srcAB.start(t0);
+  return nodes.srcs[nodes.srcs.length-1];   // 마지막 트랙 (onended 훅용)
+}
+function stopAll(nodes){
+  for(const s of nodes.srcs){ try{s.stop();}catch(e){} }
+  if(nodes.srcAB){ try{nodes.srcAB.stop();}catch(e){} }
 }
 
 let previewRAF = null;
 function stopPreview(){
   if(S.playNodes){
-    try{S.playNodes.src.stop();}catch(e){}
-    if(S.playNodes.srcAB){ try{S.playNodes.srcAB.stop();}catch(e){} }
+    stopAll(S.playNodes);
     S.playNodes=null;
   }
   S.playing = false;
@@ -1383,17 +1486,17 @@ function stopPreview(){
   drawFrame(null);
 }
 function startPreview(){
-  if(S.rendering) return;
+  if(S.rendering || !S.tracks.length) return;
   if(S.bgMode==="video" && S.bgVideo) S.bgVideo.play().catch(()=>{});
   const nodes = makePlayNodes(true);
   S.playNodes = nodes; S.playing = true;
-  const t0 = getCtx().currentTime;
-  const dur = nodes.src.buffer.duration;
+  const t0 = getCtx().currentTime + 0.05;
+  recalcOffsets();
+  const dur = S.totalDur;
   S.curDur = dur;
   scheduleFade(nodes.fade, getCtx(), t0, dur);
-  nodes.src.start();
-  if(nodes.srcAB) nodes.srcAB.start();   // 동일 시점 시작 → 샘플 동기 유지
-  nodes.src.onended = stopPreview;
+  const last = startAll(nodes, t0);
+  last.onended = stopPreview;
   $("btnPreview").textContent = "■ 정지";
   const loop = ()=>{
     if(!S.playing) return;
@@ -1420,8 +1523,8 @@ function pickMime(){
 }
 
 async function startRender(){
-  if(!S.procBuffer && !S.rawBuffer){ toast("먼저 음원을 불러오세요"); return; }
-  if(!S.procBuffer){ toast("먼저 '사운드 적용'을 눌러주세요"); return; }
+  if(!S.tracks.length){ toast("먼저 음원을 불러오세요"); return; }
+  if(!S.tracks.every(t=>t.proc)){ toast("먼저 '사운드 적용'을 눌러주세요"); return; }
   const mime = pickMime();
   if(!mime){ toast("이 브라우저는 영상 녹화를 지원하지 않습니다 (iOS 사파리 권장)", 4000); return; }
 
@@ -1435,14 +1538,19 @@ async function startRender(){
   rc.width = dims[0]; rc.height = dims[1];
   S.renderCanvas = rc;
 
-  // 오디오 경로: source → fade → analyser → recDest (+모니터)
-  const src = ctx.createBufferSource(); src.buffer = S.procBuffer;
+  // 오디오 경로: 트랙 소스들 → fade → analyser → recDest (+모니터)
   const fade = ctx.createGain();
+  const srcs = S.tracks.map(t=>{
+    const s = ctx.createBufferSource();
+    s.buffer = t.proc;
+    s.connect(fade);
+    return s;
+  });
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.8;
   const recDest = ctx.createMediaStreamDestination();
   const mon = ctx.createGain(); mon.gain.value = S.monitor ? 1 : 0;
-  src.connect(fade); fade.connect(analyser);
+  fade.connect(analyser);
   analyser.connect(recDest); analyser.connect(mon); mon.connect(ctx.destination);
 
   const vStream = rc.captureStream(30);
@@ -1456,7 +1564,8 @@ async function startRender(){
   // 화면 꺼짐 방지
   try{ if(navigator.wakeLock) S.wakeLock = await navigator.wakeLock.request("screen"); }catch(e){}
 
-  const dur = S.procBuffer.duration;
+  recalcOffsets();
+  const dur = S.totalDur;
   S.curDur = dur;
   $("pTotal").textContent = fmtTime(dur);
   $("progressWrap").style.display = "block";
@@ -1467,12 +1576,13 @@ async function startRender(){
 
   recorder.start(1000);
   if(S.bgMode==="video" && S.bgVideo){ S.bgVideo.currentTime = 0; S.bgVideo.play().catch(()=>{}); }
-  const t0 = ctx.currentTime;
+  const t0 = ctx.currentTime + 0.05;
   scheduleFade(fade, ctx, t0, dur);
-  src.start();
+  srcs.forEach((s,i)=>s.start(t0 + S.trackOffsets[i]));
   const nodes = {analyser};
-  src.onended = ()=> setTimeout(()=>{ if(S.rendering) recorder.stop(); }, 350);
-  S.renderStop = ()=>{ try{src.stop();}catch(e){} try{recorder.stop();}catch(e){} };
+  const last = srcs[srcs.length-1];
+  last.onended = ()=> setTimeout(()=>{ if(S.rendering) recorder.stop(); }, 350);
+  S.renderStop = ()=>{ for(const s of srcs){ try{s.stop();}catch(e){} } try{recorder.stop();}catch(e){} };
 
   const loop = ()=>{
     if(!S.rendering) return;
@@ -1497,7 +1607,10 @@ function finishRender(mime){
   const ext = mime.includes("mp4") ? "mp4" : "webm";
   const blob = new Blob(S.recChunks, {type: mime.split(";")[0]});
   const url = URL.createObjectURL(blob);
-  const title = ($("titleInput").value.trim() || S.fileName.replace(/\.[^.]+$/,"") || "output");
+  const title = ($("titleInput").value.trim()
+    || (S.tracks[0] && S.tracks[0].title)
+    || S.fileName.replace(/\.[^.]+$/,"") || "output")
+    + (S.tracks.length > 1 ? ` 외 ${S.tracks.length-1}곡` : "");
   $("resultVideo").src = url;
   const a = $("btnDownload");
   a.href = url; a.download = `[MV] ${title}.${ext}`;
@@ -1539,19 +1652,51 @@ function setRatioCanvas(){
   else drawFrame(null);
 }
 
-async function onAudioFile(file){
-  if(!file) return;
+function renderTrackList(){
+  const fm = $("fileMeta");
+  if(!S.tracks.length){ fm.style.display="none"; fm.innerHTML=""; return; }
+  recalcOffsets();
+  fm.style.display = "block";
+  let html = `<b>${S.tracks.length}곡 · 총 ${fmtTime(S.totalDur)}</b>`;
+  if(S.tracks.length>1)
+    html += ` <span style="color:var(--sub)">— 플리 모드 · 유튜브 챕터 자동 생성</span>`;
+  S.tracks.forEach((t,i)=>{
+    html += `<div class="trow" data-i="${i}">
+      <span class="tno">${i+1}</span>
+      <input type="text" class="ttitle" value="${t.title.replace(/"/g,"&quot;")}">
+      <span class="tdur">${fmtTime((t.proc||t.raw).duration)}</span>
+      <button class="tbtn" data-act="up">▲</button>
+      <button class="tbtn" data-act="down">▼</button>
+      <button class="tbtn" data-act="del">✕</button>
+    </div>`;
+  });
+  fm.innerHTML = html;
+}
+
+async function onAudioFiles(files){
+  const list = [...files].slice(0, 12);   // 상한 12곡
+  if(!list.length) return;
   stopPreview();
+  S.tracks = []; S.procBuffer = null; S.rawBuffer = null; S.rawMatched = null;
+  $("btnAB").style.display = "none";
   try{
-    toast("음원 분석 중…");
-    const ab = await file.arrayBuffer();
-    const buf = await getCtx().decodeAudioData(ab);
-    S.rawBuffer = buf; S.procBuffer = null; S.fileName = file.name;
-    S.lufsIn = measureLUFS(buf);
-    $("fileMeta").style.display = "block";
-    $("fileMeta").innerHTML =
-      `<b>${file.name}</b><br>` +
-      `${fmtTime(buf.duration)} · ${buf.numberOfChannels}ch · ${(buf.sampleRate/1000).toFixed(1)}kHz`;
+    let lufsSum = 0;
+    for(let i=0;i<list.length;i++){
+      toast(`음원 분석 중… (${i+1}/${list.length})`, 10000);
+      const f = list[i];
+      const ab = await f.arrayBuffer();
+      const buf = await getCtx().decodeAudioData(ab);
+      const lufs = measureLUFS(buf);
+      lufsSum += lufs;
+      S.tracks.push({name:f.name, title:f.name.replace(/\.[^.]+$/,""), raw:buf, proc:null, lufsIn:lufs});
+    }
+    S.fileName = list[0].name;
+    S.rawBuffer = S.tracks.length===1 ? S.tracks[0].raw : null;
+    S.lufsIn = lufsSum / S.tracks.length;
+    recalcOffsets();
+    renderTrackList();
+    if(S.totalDur > 25*60)
+      toast("⚠ 총 " + fmtTime(S.totalDur) + " — 25분 이상은 아이폰 메모리에 따라 실패할 수 있어요", 4500);
     $("mLufsIn").textContent = S.lufsIn.toFixed(1);
     $("mLufsOut").textContent = "–"; $("mLufsOut").className="v";
     $("mPeak").textContent = "–"; $("mPeak").className="v";
@@ -1560,18 +1705,100 @@ async function onAudioFile(file){
     $("btnWav").disabled = true;
     $("btnPreview").disabled = true;
     $("btnRender").disabled = true;
-    if(!$("titleInput").value) $("titleInput").value = file.name.replace(/\.[^.]+$/,"");
+    $("btnDesc").disabled = false;
+    if(!$("titleInput").value)
+      $("titleInput").value = S.tracks.length>1 ? "" : S.tracks[0].title;
+    $("titleInput").placeholder = S.tracks.length>1 ? "플레이리스트 제목" : "곡 제목";
     drawFrame(null);
-    toast("✓ 로드 완료 — 원본 " + S.lufsIn.toFixed(1) + " LUFS");
+    toast(`✓ ${S.tracks.length}곡 로드 완료 — 평균 ${S.lufsIn.toFixed(1)} LUFS`);
   }catch(err){
     console.error("[LUMATONE] 디코딩 실패:", err);
-    toast("이 파일을 읽을 수 없습니다: " + err.message, 4000);
+    toast("파일을 읽을 수 없습니다: " + err.message, 4000);
   }
+}
+
+// ---------- 유튜브 챕터/설명란 생성 ----------
+function buildChapters(){
+  const lines = []; let acc = 0;
+  for(const t of S.tracks){
+    lines.push(fmtTime(acc) + " " + (t.title || t.name));
+    acc += (t.proc || t.raw).duration;
+  }
+  return lines;
+}
+async function copyDescription(){
+  if(!S.tracks.length){ toast("먼저 음원을 불러오세요"); return; }
+  const main = $("titleInput").value.trim() || S.tracks[0].title;
+  const artist = $("artistInput").value.trim();
+  let txt = main + (artist ? " — " + artist : "") + "\n\n";
+  if(S.tracks.length > 1)
+    txt += "⏱ Tracklist\n" + buildChapters().join("\n") + "\n\n";
+  txt += "#music" + (S.tracks.length>1 ? " #playlist" : "")
+    + (artist ? " #" + artist.replace(/\s+/g,"") : "") + "\nMade with LUMATONE";
+  try{
+    await navigator.clipboard.writeText(txt);
+    toast("✓ 유튜브 설명란 복사됨 — 업로드 화면에 붙여넣으세요", 3000);
+  }catch(e){
+    const ta = document.createElement("textarea");
+    ta.value = txt; document.body.appendChild(ta);
+    ta.select(); document.execCommand("copy"); ta.remove();
+    toast("✓ 복사됨");
+  }
+}
+
+// ---------- 썸네일 저장 (현재 화면 구성 → 풀해상도 PNG) ----------
+function saveThumbnail(){
+  const dims = {"169":[1920,1080], "916":[1080,1920], "11":[1080,1080]}[S.ratio];
+  const c = document.createElement("canvas");
+  c.width = dims[0]; c.height = dims[1];
+  const wasR = S.rendering, wasC = S.renderCanvas;
+  S.rendering = true; S.renderCanvas = c;
+  drawFrame(null);                       // 정지 프레임을 풀해상도로 그림
+  S.rendering = wasR; S.renderCanvas = wasC;
+  c.toBlob(b=>{
+    if(!b){ toast("썸네일 생성 실패"); return; }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(b);
+    const title = $("titleInput").value.trim() || (S.tracks[0] && S.tracks[0].title) || "thumbnail";
+    a.download = `[THUMB] ${title}.png`;
+    a.click();
+    toast("✓ 썸네일 저장 — 공유 시트에서 이미지 저장", 3000);
+  }, "image/png");
 }
 
 function init(){
   $("dropzone").addEventListener("click", ()=>$("audioInput").click());
-  $("audioInput").addEventListener("change", e=>onAudioFile(e.target.files[0]));
+  $("audioInput").addEventListener("change", e=>onAudioFiles(e.target.files));
+
+  // 트랙리스트 조작 (순서/삭제/제목) — 위임 방식
+  $("fileMeta").addEventListener("click", e=>{
+    const b = e.target.closest(".tbtn"); if(!b) return;
+    const i = parseInt(b.closest(".trow").dataset.i, 10);
+    const act = b.dataset.act;
+    if(act==="del") S.tracks.splice(i,1);
+    else if(act==="up" && i>0) [S.tracks[i-1],S.tracks[i]] = [S.tracks[i],S.tracks[i-1]];
+    else if(act==="down" && i<S.tracks.length-1) [S.tracks[i+1],S.tracks[i]] = [S.tracks[i],S.tracks[i+1]];
+    else return;
+    stopPreview();
+    S.rawBuffer = S.tracks.length===1 ? S.tracks[0].raw : null;
+    S.procBuffer = S.tracks.length===1 ? S.tracks[0].proc : null;
+    renderTrackList();
+    if(!S.tracks.length){
+      $("btnProcess").disabled = true; $("btnPreview").disabled = true;
+      $("btnRender").disabled = true; $("btnDesc").disabled = true;
+      $("n1").classList.remove("done");
+    }else if(!S.tracks.every(t=>t.proc)){
+      $("btnPreview").disabled = true; $("btnRender").disabled = true;
+    }
+    drawFrame(null);
+  });
+  $("fileMeta").addEventListener("input", e=>{
+    const inp = e.target.closest(".ttitle"); if(!inp) return;
+    const i = parseInt(inp.closest(".trow").dataset.i, 10);
+    if(S.tracks[i]) S.tracks[i].title = inp.value;
+  });
+  $("btnThumb").addEventListener("click", saveThumbnail);
+  $("btnDesc").addEventListener("click", copyDescription);
 
   bindChips("presetChips", v=>{ S.preset=v; });
   $("lufsRange").addEventListener("input", e=>{
@@ -1596,8 +1823,10 @@ function init(){
   });
   $("btnProcess").addEventListener("click", processAudio);
   $("btnWav").addEventListener("click", ()=>{
-    if(!S.procBuffer) return;
-    const blob = encodeWAV24(S.procBuffer);
+    if(S.tracks.length > 1){ toast("WAV 저장은 싱글 모드 전용입니다 (플리는 영상으로 출력)"); return; }
+    const proc = S.tracks[0] && S.tracks[0].proc;
+    if(!proc) return;
+    const blob = encodeWAV24(proc);
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     const title = $("titleInput").value.trim() || "master";
@@ -1821,6 +2050,68 @@ function init(){
     // iOS: 백그라운드 전환 시 rAF/녹화 중단 → 사용자에게 고지
     if(document.hidden && S.rendering) console.warn("[LUMATONE] 렌더 중 백그라운드 전환 감지");
   });
+
+  // ---------- 저장된 설정 복원 (있으면) ----------
+  (function restoreLook(){
+    const L = store.get("lumatone.look");
+    if(!L) return;
+    try{
+      if(L.preset){ S.preset = L.preset; syncChip("presetChips", L.preset); }
+      if(typeof L.targetLUFS === "number"){
+        S.targetLUFS = L.targetLUFS;
+        $("lufsRange").value = L.targetLUFS;
+        $("lufsLabel").textContent = L.targetLUFS.toFixed(1) + " LUFS";
+      }
+      if(typeof L.amount === "number"){
+        S.amount = L.amount;
+        $("amtRange").value = L.amount;
+        $("amtLabel").textContent = Math.round(L.amount*100) + "%";
+      }
+      if(L.viz){ S.viz = L.viz; syncChip("vizChips", L.viz); }
+      if(L.tone){ S.tone = L.tone; syncChip("toneChips", L.tone); }
+      if(L.mood){ S.mood = L.mood; syncChip("moodChips", L.mood); }
+      if(L.font){ selectFont(L.font); syncChip("fontChips", L.font); }
+      if(L.accent){
+        S.accent = L.accent;
+        for(const el of $("swatches").querySelectorAll(".sw"))
+          el.classList.toggle("on", el.dataset.v===L.accent);
+      }
+      for(const k of ["kb","pump","moodShift","fade","fxOverlay","dust","cine","glowBoost","artFlow"]){
+        if(typeof L[k] === "boolean"){
+          S[k] = L[k];
+          $(TOGGLE_IDS[k]).classList.toggle("on", L[k]);
+        }
+      }
+      if(typeof L.sens === "number"){
+        S.sens = L.sens;
+        $("sensRange").value = L.sens;
+        $("sensLabel").textContent = L.sens.toFixed(1) + "×";
+      }
+      if(L.vizPos) S.vizPos = L.vizPos;
+      if(typeof L.vizScale === "number"){
+        S.vizScale = L.vizScale;
+        $("vscaleRange").value = L.vizScale;
+        $("vscaleLabel").textContent = Math.round(L.vizScale*100)+"%";
+      }
+      if(L.textPos) S.textPos = L.textPos;
+      if(typeof L.textScale === "number"){
+        S.textScale = L.textScale;
+        $("tscaleRange").value = L.textScale;
+        $("tscaleLabel").textContent = Math.round(L.textScale*100)+"%";
+      }
+      if(L.artist) $("artistInput").value = L.artist;
+      if(L.wm) $("wmInput").value = L.wm;
+      if(L.quality === 720 || L.quality === 1080){
+        S.quality = L.quality;
+        $("qBtn").textContent = "화질 " + L.quality + "p";
+      }
+      if(L.ratio && L.ratio !== S.ratio){
+        S.ratio = L.ratio;
+        syncChip("ratioChips", L.ratio);
+        setRatioCanvas();
+      }
+    }catch(err){ console.warn("[LUMATONE] 설정 복원 일부 실패:", err); }
+  })();
 
   refreshArt(false);
 }
