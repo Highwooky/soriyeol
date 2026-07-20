@@ -669,7 +669,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p style="font-size:.7rem;color:var(--sub);line-height:1.5;margin:6px 0 0">아주 긴 플리를 나눠서 렌더한 경우, 만든 영상들을 순서대로 선택하면 하나로 이어붙입니다 (앱 안에서 처리, 다른 프로그램 불필요). 같은 화질·비율로 만든 영상끼리 합치세요.</p>
 </section>
 
-<footer>LUMATONE v4.8 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v4.9 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -5315,23 +5315,27 @@ function verifyPlayable(blob){
 }
 
 // 오디오 트랙 자가 진단: true=정상 / false=트랙 불량·무음 / null=판정 불가
-async function verifyAudio(blob){
-  // 1차: 오디오 디코드 + 에너지 검사 (가장 확실)
-  try{
-    const ab = await blob.arrayBuffer();
-    const buf = await getCtx().decodeAudioData(ab);
-    const d = buf.getChannelData(0);
-    let peak = 0;
-    const step = Math.max(1, Math.floor(d.length/50000));
-    for(let i=0;i<d.length;i+=step){ const a=Math.abs(d[i]); if(a>peak) peak=a; }
-    return buf.duration > 0 && peak > 0.001;
-  }catch(e){ console.warn("[LUMATONE] 오디오 1차 판정 불가:", e.message); }
-  // 2차: 재생 기반 디코드 바이트 카운트 (WebKit)
+// 긴 영상은 전체 디코딩 시 메모리가 폭발하므로 재생 기반(가벼움) 판정만 사용
+async function verifyAudio(blob, durSec){
+  const isLong = (durSec || 0) > 300;   // 5분 초과면 전체 디코딩 금지
+  if(!isLong){
+    // 짧은 영상: 디코드 + 에너지 검사 (가장 확실)
+    try{
+      const ab = await blob.arrayBuffer();
+      const buf = await getCtx().decodeAudioData(ab);
+      const d = buf.getChannelData(0);
+      let peak = 0;
+      const step = Math.max(1, Math.floor(d.length/50000));
+      for(let i=0;i<d.length;i+=step){ const a=Math.abs(d[i]); if(a>peak) peak=a; }
+      return buf.duration > 0 && peak > 0.001;
+    }catch(e){ console.warn("[LUMATONE] 오디오 1차 판정 불가:", e.message); }
+  }
+  // 긴 영상 또는 1차 실패: 재생 기반 디코드 바이트 카운트 (메모리 부담 없음)
   return await new Promise(res=>{
     const v = document.createElement("video");
     v.muted = true; v.playsInline = true;
     const u = URL.createObjectURL(blob);
-    const done = r => { try{v.pause();}catch(e){} URL.revokeObjectURL(u); res(r); };
+    const done = r => { try{v.pause();}catch(e){} v.removeAttribute("src"); URL.revokeObjectURL(u); res(r); };
     const tm = setTimeout(()=>done(null), 5000);
     v.onerror = ()=>{ clearTimeout(tm); done(false); };
     v.onloadeddata = async ()=>{
@@ -5672,27 +5676,34 @@ async function fastRender(){
     DG.msFFT = Math.round(tFFT); DG.msDraw = Math.round(tDraw);
     DG.msEnc = Math.round(tEnc); DG.msWait = Math.round(tWait);
     DG.frames = frames;
+    // 진단을 마무리(메모리 위험 구간) 전에 미리 저장 → 크래시해도 기록 남음
+    DG.speed = +(dur / ((performance.now()-t1)/1000)).toFixed(2);
+    try{ store.set("lumatone.lastdiag", DG); }catch(e){}
 
     if(S.rendering && !encErr){
       await ve.flush(); await ae.flush();
+      try{ ve.close(); }catch(e){} try{ ae.close(); }catch(e){}   // 인코더 즉시 해제로 메모리 회수
       muxer.finalize();
-      const blob = new Blob([muxer.target.buffer], {type:"video/mp4"});
-      const speed = dur / ((performance.now()-t1)/1000);
-      DG.speed = +speed.toFixed(2);
-      const playable = await verifyPlayable(blob);   // 영상 트랙 검증
-      const audioOk = playable ? await verifyAudio(blob) : false;   // 오디오 트랙 해부 검사
+      const buffer = muxer.target.buffer;
+      const blob = new Blob([buffer], {type:"video/mp4"});
+      muxer.target.buffer = null;   // muxer 내부 참조 해제 (중복 보유 방지)
+      const speed = DG.speed;
+      const playable = await verifyPlayable(blob);   // 영상 트랙 검증 (가벼움)
+      // 긴 영상은 전체 오디오 디코딩을 피하고 재생 기반 판정 (메모리 폭발 방지)
+      const audioOk = playable ? await verifyAudio(blob, dur) : false;
       DG.vVideo = playable; DG.vAudio = audioOk; DG.mb = +(blob.size/1048576).toFixed(1);
+      try{ store.set("lumatone.lastdiag", DG); }catch(e){}
       endRenderUI();
       if(!playable){
-        disableFast("결과물 재생 불가");
-      }else if(audioOk === false){
-        disableFast("오디오 트랙 생성 실패");
+        // 검증엔 실패했지만 파일은 있으니 일단 제공 (재생은 사용자가 확인)
+        showResult(blob, "mp4");
+        toast("⚠ 렌더는 끝났지만 자동 검증에 실패했습니다 — 영상을 직접 재생해 확인해주세요", 6000);
       }else{
         showResult(blob, "mp4");
         if(audioOk === true)
-          toast(`✓ 렌더 완료 (오디오 정상 포함 확인) — ${speed.toFixed(1)}배속 · ${(blob.size/1048576).toFixed(1)} MB`, 4500);
+          toast(`✓ 렌더 완료 (오디오 정상 포함) — ${speed.toFixed(1)}배속 · ${(blob.size/1048576).toFixed(1)} MB`, 4500);
         else
-          toast(`✓ 렌더 완료 — ${speed.toFixed(1)}배속 (오디오 자동판정 불가 — 재생해 확인하세요)`, 4500);
+          toast(`✓ 렌더 완료 — ${speed.toFixed(1)}배속 · ${(blob.size/1048576).toFixed(1)} MB (오디오는 재생해 확인하세요)`, 4500);
       }
     }else{
       endRenderUI();
@@ -6041,12 +6052,14 @@ function init(){
   $("btnThumb").addEventListener("click", saveThumbnail);
   $("btnDesc").addEventListener("click", copyDescription);
   $("btnDiag").addEventListener("click", async ()=>{
+    let last = S.diag;
+    if(!last){ try{ last = store.get("lumatone.lastdiag"); }catch(e){} }
     const info = {
-      app: "LUMATONE v4.8",
+      app: "LUMATONE v4.9",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
-      lastRender: S.diag || "렌더 기록 없음",
+      lastRender: last || "렌더 기록 없음",
     };
     const txt = JSON.stringify(info, null, 1);
     try{ await navigator.clipboard.writeText(txt); toast("✓ 진단 정보 복사됨 — 대화창에 붙여넣어 주세요", 3500); }
