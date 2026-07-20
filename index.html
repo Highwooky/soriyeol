@@ -331,6 +331,9 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
     <button class="chip" data-v="helix">헬릭스</button>
     <button class="chip" data-v="lp">LP 레코드</button>
     <button class="chip" data-v="dots">별자리</button>
+    <button class="chip" data-v="progring">진행률 링 ⏱</button>
+    <button class="chip" data-v="timeline">타임라인 ⏱</button>
+    <button class="chip" data-v="radial">레디얼 버스트</button>
     <button class="chip" data-v="none">없음</button>
   </div>
   <div class="label">포인트 색</div>
@@ -476,6 +479,10 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
     <button class="chip" data-v="shake">셰이크</button>
     <button class="chip" data-v="glitch">글리치</button>
     <button class="chip" data-v="ghost">고스트</button>
+    <button class="chip" data-v="rgbsplit">RGB 스플릿</button>
+    <button class="chip" data-v="zoomblur">줌 블러</button>
+    <button class="chip" data-v="strobe">스트로브</button>
+    <button class="chip" data-v="spin">스핀 셰이크</button>
     <button class="chip hot" data-v="mix">믹스 ✦</button>
   </div>
   <div class="label">이펙트 강도: <b id="fxIntLabel" style="color:var(--text)">강 (140%)</b></div>
@@ -610,7 +617,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p class="notice" id="renderNote">렌더 중 다른 앱으로 이동하거나 화면을 잠그면 작업이 멈춥니다.</p>
 </section>
 
-<footer>LUMATONE v3.9 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v4.0 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -3793,7 +3800,7 @@ function updateBeat(bass, dt, tSec){
       if(S.viz==="burst") spawnBurst(0.7);
       if(S.beatFx !== "none"){
         S.fxKick = 1;
-        const opts = ["zoom","flash","shake","glitch","ghost"];
+        const opts = ["zoom","flash","shake","glitch","ghost","rgbsplit","zoomblur","strobe","spin"];
         S.fxCur = S.beatFx==="mix"
           ? opts[phase % opts.length]   // 박자 순서대로 순환 (결정론적)
           : S.beatFx;
@@ -3824,7 +3831,7 @@ function updateBeat(bass, dt, tSec){
     // 비트 이펙트 발동 (믹스는 시드 난수로 결정론적 선택 → 고속 렌더에서도 동일)
     if(S.beatFx !== "none"){
       S.fxKick = 1;
-      const opts = ["zoom","flash","shake","glitch","ghost"];
+      const opts = ["zoom","flash","shake","glitch","ghost","rgbsplit","zoomblur","strobe","spin"];
       S.fxCur = S.beatFx==="mix"
         ? opts[Math.floor(mulberry32(1+Math.floor(tSec*997))()*opts.length)]
         : S.beatFx;
@@ -3901,17 +3908,27 @@ function drawBackground(x, w, h, progress, tSec){
   // 비트 이펙트: 줌 펀치 / 셰이크 (시드 난수 → 고속 렌더에서도 결정론적)
   let shx = 0, shy = 0;
   const FI = S.fxIntensity;
+  let spin = 0;
   if(S.fxKick > 0.02){
     const k = S.fxKick;
     if(S.fxCur==="zoom") pumpZ *= 1 + k*0.26*FI;        // 10% → 26%×강도 (확 확대)
+    else if(S.fxCur==="zoomblur") pumpZ *= 1 + k*0.20*FI;  // 줌 블러 (후처리에서 블러 추가)
     else if(S.fxCur==="shake"){
       const rnd = mulberry32(7+Math.floor(tSec*60));
       shx = (rnd()*2-1)*k*w*0.055*FI;                   // 2% → 5.5%×강도
       shy = (rnd()*2-1)*k*h*0.055*FI;
       pumpZ *= 1 + k*0.09*FI;   // 흔들림으로 드러나는 가장자리 커버
     }
+    else if(S.fxCur==="spin"){
+      const rnd = mulberry32(11+Math.floor(tSec*60));
+      shx = (rnd()*2-1)*k*w*0.04*FI;
+      shy = (rnd()*2-1)*k*h*0.04*FI;
+      spin = (rnd()*2-1)*k*0.06*FI;   // 미세 회전 (라디안)
+      pumpZ *= 1 + k*0.12*FI;         // 회전 시 모서리 커버
+    }
   }
   x.save();
+  if(spin !== 0){ x.translate(w/2, h/2); x.rotate(spin); x.translate(-w/2, -h/2); }
   x.translate(shx, shy);
   // ① 동영상 배경 (자동 반복, 커버 핏)
   if(S.bgMode==="video" && S.bgVideo && S.bgVideo.readyState >= 2){
@@ -4484,6 +4501,114 @@ function drawFrame(audio, progress, tOverride){
         x.beginPath(); x.arc(q.px, q.py, r, 0, Math.PI*2); x.fill();
       }
     }
+    else if(S.viz==="progring"){
+      // 프로그레스 링 — 곡 진행률이 원형으로 차오르며 스펙트럼 막대가 방사
+      const cx=w*S.vizPos.x, cy=h*S.vizPos.y;
+      const R = mn*0.26*VS;
+      const pr = p===null ? 0 : p;
+      // 배경 트랙
+      x.strokeStyle = "rgba(255,255,255,0.15)";
+      x.lineWidth = Math.max(3, mn*0.008);
+      x.beginPath(); x.arc(cx,cy,R,0,Math.PI*2); x.stroke();
+      // 진행 호 (12시 시작, 시계방향)
+      x.strokeStyle = S.accent;
+      x.shadowColor = S.accent; x.shadowBlur = mn*0.02*GB;
+      x.lineCap = "round";
+      x.beginPath(); x.arc(cx,cy,R,-Math.PI/2, -Math.PI/2 + pr*Math.PI*2); x.stroke();
+      x.shadowBlur = 0;
+      // 방사형 스펙트럼 막대 (링 바깥)
+      const n=64;
+      for(let i=0;i<n;i++){
+        const b = S.smoothBands[i];
+        const a = (i/n)*Math.PI*2 - Math.PI/2;
+        const r0 = R*1.08, r1 = r0 + Math.pow(b,1.4)*mn*0.16*VS;
+        x.strokeStyle = S.accent;
+        x.globalAlpha = 0.3 + b*0.7;
+        x.lineWidth = Math.max(1.5, mn*0.004);
+        x.beginPath();
+        x.moveTo(cx+Math.cos(a)*r0, cy+Math.sin(a)*r0);
+        x.lineTo(cx+Math.cos(a)*r1, cy+Math.sin(a)*r1);
+        x.stroke();
+      }
+      x.globalAlpha = 1;
+      // 중앙 경과/남은 시간
+      if(p!==null && S.curDur>0){
+        const el = p*S.curDur;
+        x.fillStyle = "#fff"; x.textAlign="center"; x.textBaseline="middle";
+        x.font = `700 ${Math.round(mn*0.07)}px -apple-system,sans-serif`;
+        x.fillText(fmtTime(el), cx, cy - mn*0.02);
+        x.fillStyle = "rgba(255,255,255,0.5)";
+        x.font = `500 ${Math.round(mn*0.035)}px -apple-system,sans-serif`;
+        x.fillText(fmtTime(S.curDur), cx, cy + mn*0.045);
+        x.textBaseline = "alphabetic";
+      }
+    }
+    else if(S.viz==="timeline"){
+      // 타임라인 웨이브 — 전체 파형 + 재생 위치 스크럽선 (지나간 부분 강조)
+      const n=120;
+      const pr = p===null ? 0 : p;
+      const yc = h*S.vizPos.y + dy*0;
+      const bw = w*0.9, x0 = w*0.05;
+      const amp = h*0.18*VS;
+      // 파형(대역 에너지를 좌우로 펼침, 시드 고정으로 안정적 실루엣)
+      const rnd = mulberry32(48151623);
+      const bars = [];
+      for(let i=0;i<n;i++){
+        const b = S.smoothBands[Math.floor(i*64/n)];
+        bars.push(0.2 + b*0.8 + rnd()*0.15);
+      }
+      for(let i=0;i<n;i++){
+        const bx = x0 + bw*i/(n-1);
+        const played = (i/(n-1)) <= pr;
+        const bh = bars[i]*amp;
+        x.fillStyle = played ? S.accent : "rgba(255,255,255,0.25)";
+        x.globalAlpha = played ? (0.6+bars[i]*0.4) : 0.5;
+        x.fillRect(bx-Math.max(1,bw/n*0.3), yc-bh, Math.max(2,bw/n*0.6), bh*2);
+      }
+      x.globalAlpha = 1;
+      // 재생 위치 스크럽선
+      const px = x0 + bw*pr;
+      x.strokeStyle = "#fff"; x.lineWidth = Math.max(2, mn*0.004);
+      x.shadowColor = S.accent; x.shadowBlur = mn*0.02*GB;
+      x.beginPath(); x.moveTo(px, yc-amp*1.2); x.lineTo(px, yc+amp*1.2); x.stroke();
+      x.shadowBlur = 0;
+      x.fillStyle = "#fff";
+      x.beginPath(); x.arc(px, yc-amp*1.2, mn*0.008, 0, Math.PI*2); x.fill();
+      // 경과 시간
+      if(p!==null && S.curDur>0){
+        x.fillStyle="#fff"; x.textAlign="center";
+        x.font = `600 ${Math.round(mn*0.03)}px -apple-system,sans-serif`;
+        x.fillText(fmtTime(p*S.curDur)+" / "+fmtTime(S.curDur), w/2, yc+amp*1.7);
+      }
+    }
+    else if(S.viz==="radial"){
+      // 레디얼 버스트 — 중심에서 뻗는 광선 스펙트럼 + 진행률 도넛
+      const cx=w*S.vizPos.x, cy=h*S.vizPos.y;
+      const pr = p===null ? 0 : p;
+      const n=72, baseR=mn*0.10*VS;
+      x.save(); x.translate(cx,cy); x.rotate(S.ringAngle*0.3);
+      for(let i=0;i<n;i++){
+        const b = S.smoothBands[Math.floor(i*64/n)];
+        const a = (i/n)*Math.PI*2;
+        const len = baseR + Math.pow(b,1.3)*mn*0.34*VS*(1+bass*0.3);
+        const hue = (i/n*360 + tSec*30) % 360;
+        x.strokeStyle = S.hueCycle ? hueHex(hue) : S.accent;
+        x.globalAlpha = 0.4 + b*0.6;
+        x.lineWidth = Math.max(1.5, mn*0.005*(0.5+b));
+        x.shadowColor = x.strokeStyle; x.shadowBlur = mn*0.01*GB;
+        x.beginPath();
+        x.moveTo(Math.cos(a)*baseR, Math.sin(a)*baseR);
+        x.lineTo(Math.cos(a)*len, Math.sin(a)*len);
+        x.stroke();
+      }
+      x.restore();
+      x.globalAlpha = 1; x.shadowBlur = 0;
+      // 진행률 도넛 (중심)
+      x.strokeStyle = "rgba(255,255,255,0.2)"; x.lineWidth = Math.max(2,mn*0.006);
+      x.beginPath(); x.arc(cx,cy,baseR*0.7,0,Math.PI*2); x.stroke();
+      x.strokeStyle = "#fff"; x.lineCap="round";
+      x.beginPath(); x.arc(cx,cy,baseR*0.7,-Math.PI/2,-Math.PI/2+pr*Math.PI*2); x.stroke();
+    }
     x.restore();
 
     // ---------- 텍스트 ----------
@@ -4644,6 +4769,43 @@ function drawFrame(audio, progress, tOverride){
         x.drawImage(c, d*1.6, 0);
         x.globalAlpha = 1;
         x.globalCompositeOperation = "source-over";
+      }else if(S.fxCur==="rgbsplit"){
+        // RGB 채널 분리 — 비트마다 색이 갈라졌다 모임 (틱톡 시그니처)
+        const d = Math.max(2, w*0.02*k*FI);
+        x.globalCompositeOperation = "lighter";
+        // 스냅샷을 색조 오버레이로 좌우 오프셋 (근사 채널분리)
+        x.globalAlpha = Math.min(0.6, k*0.55*FI);
+        x.drawImage(c, -d, 0);   // 왼쪽 잔상 (붉은 기운)
+        x.drawImage(c,  d, 0);   // 오른쪽 잔상 (푸른 기운)
+        x.globalAlpha = 1;
+        x.globalCompositeOperation = "source-over";
+        // 색 틴트 스트립
+        x.globalCompositeOperation = "screen";
+        x.globalAlpha = Math.min(0.35, k*0.35*FI);
+        x.fillStyle = "#FF0044"; x.fillRect(-d,0,w,h);
+        x.fillStyle = "#0088FF"; x.fillRect(d,0,w,h);
+        x.globalAlpha = 1;
+        x.globalCompositeOperation = "source-over";
+      }else if(S.fxCur==="zoomblur"){
+        // 방사형 줌 블러 — 중심에서 퍼지는 모션 블러 (여러 겹 확대 합성)
+        x.globalCompositeOperation = "lighter";
+        for(let s=1;s<=4;s++){
+          const sc = 1 + s*0.025*k*FI;
+          const dw2 = w*sc, dh2 = h*sc;
+          x.globalAlpha = Math.min(0.5, k*0.35*FI)/s;
+          x.drawImage(c, (w-dw2)/2, (h-dh2)/2, dw2, dh2);
+        }
+        x.globalAlpha = 1;
+        x.globalCompositeOperation = "source-over";
+      }else if(S.fxCur==="strobe"){
+        // 스트로브 — 강한 흑백 점멸 (프레임 시드로 결정론적 점멸)
+        const rnd = mulberry32(500+Math.floor(tSec*30));
+        if(rnd() < 0.5*k){
+          x.fillStyle = rnd()<0.5 ? "rgba(255,255,255,0.85)" : "rgba(0,0,0,0.7)";
+          x.globalAlpha = Math.min(0.9, k*FI);
+          x.fillRect(0,0,w,h);
+          x.globalAlpha = 1;
+        }
       }
     }
     if(S.glitchN > 0){
@@ -5556,7 +5718,7 @@ function init(){
   $("btnDesc").addEventListener("click", copyDescription);
   $("btnDiag").addEventListener("click", async ()=>{
     const info = {
-      app: "LUMATONE v3.9",
+      app: "LUMATONE v4.0",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
