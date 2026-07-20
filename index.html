@@ -669,7 +669,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p style="font-size:.7rem;color:var(--sub);line-height:1.5;margin:6px 0 0">아주 긴 플리를 나눠서 렌더한 경우, 만든 영상들을 순서대로 선택하면 하나로 이어붙입니다 (앱 안에서 처리, 다른 프로그램 불필요). 같은 화질·비율로 만든 영상끼리 합치세요.</p>
 </section>
 
-<footer>LUMATONE v5.2 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v5.3 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -5302,13 +5302,17 @@ function extractAsc(desc){
 }
 
 // 결과물이 이 기기에서 실제로 재생 가능한지 즉석 검증 (4초 타임아웃)
-function verifyPlayable(blob){
+function verifyPlayable(blob, durSec){
   return new Promise(res=>{
     const v = document.createElement("video");
     v.muted = true; v.playsInline = true; v.preload = "metadata";
     const u = URL.createObjectURL(blob);
     const done = ok => { clearTimeout(tm); v.removeAttribute("src"); URL.revokeObjectURL(u); res(ok); };
-    const tm = setTimeout(()=>done(false), 4000);
+    // moov가 파일 끝(fastStart:false)에 있으면 메타데이터 도달까지 파일을 많이 읽어야 함
+    //   → 파일 크기·길이에 비례해 타임아웃을 넉넉히 (긴 영상 오판 방지)
+    const mb = blob.size/1048576;
+    const timeout = Math.min(30000, Math.max(4000, mb*40, (durSec||0)*15));
+    const tm = setTimeout(()=>done(null), timeout);   // 시간 초과는 false 아닌 null(판정불가)
     v.onloadedmetadata = ()=> done(isFinite(v.duration) && v.duration > 0);
     v.onerror = ()=> done(false);
     v.src = u;
@@ -5476,10 +5480,16 @@ async function mergeVideos(files){
     if(S.rendering && !encErr){
       await ve.flush(); await ae.flush(); muxer.finalize();
       const blob=new Blob([muxer.target.buffer],{type:"video/mp4"});
-      const ok=await verifyPlayable(blob);
+      muxer.target.buffer=null;
+      const ok=await verifyPlayable(blob, totalDur);   // true/false/null
       endRenderUI();
-      if(ok){ showResult(blob,"mp4"); toast(`✓ ${clips.length}개 영상 합치기 완료 — ${fmtTime(totalDur)} · ${(blob.size/1048576).toFixed(1)}MB`,5000); }
-      else toast("합친 영상 검증 실패 — 같은 화질·비율의 영상인지 확인하세요",5000);
+      if(ok===false){
+        showResult(blob,"mp4");
+        toast("⚠ 합치기는 끝났지만 자동 검증 실패 — 재생해 확인하세요 (같은 화질·비율 권장)",6000);
+      }else{
+        showResult(blob,"mp4");
+        toast(`✓ ${clips.length}개 영상 합치기 완료 — ${fmtTime(totalDur)} · ${(blob.size/1048576).toFixed(1)}MB`,5000);
+      }
     }else{ endRenderUI(); if(encErr) toast("합치기 실패: "+(encErr.message||"인코더 오류"),5000); }
   }catch(err){
     console.error("[LUMATONE] 영상 합치기 실패:",err); endRenderUI();
@@ -5733,22 +5743,26 @@ async function fastRender(){
         buffer = null;
       }
       const speed = DG.speed;
-      const playable = await verifyPlayable(blob);   // 영상 트랙 검증 (가벼움)
+      const playable = await verifyPlayable(blob, dur);   // true/false/null(판정불가)
       // 긴 영상은 전체 오디오 디코딩을 피하고 재생 기반 판정 (메모리 폭발 방지)
-      const audioOk = playable ? await verifyAudio(blob, dur) : false;
+      const audioOk = (playable !== false) ? await verifyAudio(blob, dur) : false;
       DG.vVideo = playable; DG.vAudio = audioOk; DG.mb = +(blob.size/1048576).toFixed(1);
       try{ store.set("lumatone.lastdiag", DG); }catch(e){}
       endRenderUI();
-      if(!playable){
-        // 검증엔 실패했지만 파일은 있으니 일단 제공 (재생은 사용자가 확인)
+      if(playable === false){
+        // 명확히 재생 불가 — 그래도 파일은 제공 (사용자가 직접 확인)
         showResult(blob, "mp4");
         toast("⚠ 렌더는 끝났지만 자동 검증에 실패했습니다 — 영상을 직접 재생해 확인해주세요", 6000);
       }else{
+        // true(정상) 또는 null(큰 파일이라 자동판정 시간초과 — 파일은 정상일 가능성 높음)
         showResult(blob, "mp4");
-        if(audioOk === true)
-          toast(`✓ 렌더 완료 (오디오 정상 포함) — ${speed.toFixed(1)}배속 · ${(blob.size/1048576).toFixed(1)} MB`, 4500);
+        const sz = (blob.size/1048576).toFixed(0);
+        if(playable === null)
+          toast(`✓ 렌더 완료 — ${speed.toFixed(1)}배속 · ${sz}MB (긴 영상이라 자동검증은 생략 — 재생해 확인하세요)`, 5500);
+        else if(audioOk === true)
+          toast(`✓ 렌더 완료 (오디오 정상 포함) — ${speed.toFixed(1)}배속 · ${sz}MB`, 4500);
         else
-          toast(`✓ 렌더 완료 — ${speed.toFixed(1)}배속 · ${(blob.size/1048576).toFixed(1)} MB (오디오는 재생해 확인하세요)`, 4500);
+          toast(`✓ 렌더 완료 — ${speed.toFixed(1)}배속 · ${sz}MB (오디오는 재생해 확인하세요)`, 4500);
       }
     }else{
       if(opfsWritable){ try{ await opfsWritable.close(); }catch(e){} }
@@ -6104,7 +6118,7 @@ function init(){
     let last = S.diag;
     if(!last){ try{ last = store.get("lumatone.lastdiag"); }catch(e){} }
     const info = {
-      app: "LUMATONE v5.2",
+      app: "LUMATONE v5.3",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
