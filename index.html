@@ -669,7 +669,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p style="font-size:.7rem;color:var(--sub);line-height:1.5;margin:6px 0 0">아주 긴 플리를 나눠서 렌더한 경우, 만든 영상들을 순서대로 선택하면 하나로 이어붙입니다 (앱 안에서 처리, 다른 프로그램 불필요). 같은 화질·비율로 만든 영상끼리 합치세요.</p>
 </section>
 
-<footer>LUMATONE v4.9 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v5.1 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -2713,6 +2713,7 @@ function saveLook(){
     vizPos:S.vizPos, vizScale:S.vizScale, textPos:S.textPos, textScale:S.textScale,
     artist: $("artistInput") ? $("artistInput").value : "",
     wm: $("wmInput") ? $("wmInput").value : "",
+    title: $("titleInput") ? $("titleInput").value : "",
   });
 }
 let saveT = null;
@@ -5409,7 +5410,7 @@ async function mergeVideos(files){
     for(const c2 of cands){ try{ const r=await VideoEncoder.isConfigSupported({codec:c2,width:W,height:H,bitrate:8_000_000,framerate:fps}); if(r.supported){codec=c2;break;} }catch(e){} }
     if(!codec) throw new Error("H.264 프로파일 없음");
     const muxer = new Mp4Muxer.Muxer({ target:new Mp4Muxer.ArrayBufferTarget(),
-      video:{codec:"avc",width:W,height:H}, audio:{codec:"aac",sampleRate:projSR,numberOfChannels:2}, fastStart:"in-memory" });
+      video:{codec:"avc",width:W,height:H}, audio:{codec:"aac",sampleRate:projSR,numberOfChannels:2}, fastStart:false });
     let gotDesc=false;
     ve = new VideoEncoder({ output:(c,m)=>{ if(!gotDesc){ if(!(m&&m.decoderConfig&&m.decoderConfig.description)){encErr=new Error("avcC 미제공");return;} gotDesc=true; } muxer.addVideoChunk(c,m); }, error:e=>{encErr=e;} });
     ve.configure({codec,width:W,height:H,bitrate:8_000_000,framerate:fps,avc:{format:"avc"}});
@@ -5522,8 +5523,9 @@ async function fastRender(){
   document.body.classList.add("renderlock");
   S.renderStop = null;   // 고속 모드는 S.rendering 플래그로 취소
   store.set("lumatone.rflag", {t:Date.now(), q:S.quality, dur:S.totalDur});   // 메모리 크래시 감지용
-  // 긴 영상은 비트레이트를 낮춰 최종 파일·메모리 크기 완화 (muxer가 in-memory라 중요)
-  const longFactor = dur > 900 ? 0.6 : dur > 480 ? 0.75 : 1.0;
+  // 긴 영상은 비트레이트를 낮춰 최종 파일·메모리 크기 완화 (버퍼가 메모리에 남음)
+  //   20분+ 는 특히 공격적으로 (720p에서 화질 손실 크지 않음)
+  const longFactor = dur > 1080 ? 0.45 : dur > 900 ? 0.55 : dur > 480 ? 0.7 : 1.0;
   const VBR = Math.round((S.quality===1080 ? 10_000_000 : 6_000_000) * longFactor);
   $("pTotal").textContent = fmtTime(dur);
   $("progressWrap").style.display = "block";
@@ -5555,12 +5557,16 @@ async function fastRender(){
     }
     if(!codec) throw new Error("지원되는 H.264 프로파일 없음");
     DG.codec = codec;
+    // fastStart:false → 샘플을 즉시 버퍼에 쓰고 원본 참조를 해제(sample.data=null)해
+    //   메모리를 점진적으로 회수한다. in-memory는 전 샘플을 끝까지 들고 있어 긴 영상에서 크래시.
+    //   (moov가 파일 끝에 위치 — 로컬 재생·업로드에는 지장 없음)
     const muxer = new Mp4Muxer.Muxer({
       target: new Mp4Muxer.ArrayBufferTarget(),
       video: {codec:"avc", width:W, height:H},
       audio: {codec:"aac", sampleRate:projSR, numberOfChannels:2},
-      fastStart: "in-memory",
+      fastStart: false,
     });
+    DG.fastStart = false;
     let gotDesc = false;
     ve = new VideoEncoder({
       output:(c,m)=>{
@@ -5684,9 +5690,10 @@ async function fastRender(){
       await ve.flush(); await ae.flush();
       try{ ve.close(); }catch(e){} try{ ae.close(); }catch(e){}   // 인코더 즉시 해제로 메모리 회수
       muxer.finalize();
-      const buffer = muxer.target.buffer;
+      let buffer = muxer.target.buffer;
+      muxer.target.buffer = null;   // muxer 내부 참조 먼저 해제
       const blob = new Blob([buffer], {type:"video/mp4"});
-      muxer.target.buffer = null;   // muxer 내부 참조 해제 (중복 보유 방지)
+      buffer = null;   // Blob이 데이터를 소유하므로 원본 ArrayBuffer 즉시 해제 → GC 회수
       const speed = DG.speed;
       const playable = await verifyPlayable(blob);   // 영상 트랙 검증 (가벼움)
       // 긴 영상은 전체 오디오 디코딩을 피하고 재생 기반 판정 (메모리 폭발 방지)
@@ -5745,6 +5752,7 @@ async function startRender(){
   if(!S.tracks.length){ toast("먼저 음원을 불러오세요"); return; }
   if(!S.tracks.every(t=>t.proc)){ toast("먼저 '사운드 적용'을 눌러주세요"); return; }
 
+  saveLook();   // 렌더 도중 크래시해도 설정이 남도록 즉시 저장
   recalcOffsets();
   const durMin = S.totalDur / 60;
   const sr0 = S.tracks[0].proc.sampleRate;
@@ -6055,7 +6063,7 @@ function init(){
     let last = S.diag;
     if(!last){ try{ last = store.get("lumatone.lastdiag"); }catch(e){} }
     const info = {
-      app: "LUMATONE v4.9",
+      app: "LUMATONE v5.1",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
@@ -6893,6 +6901,7 @@ function init(){
         $("tscaleRange").value = L.textScale;
         $("tscaleLabel").textContent = Math.round(L.textScale*100)+"%";
       }
+      if(L.title && $("titleInput")) $("titleInput").value = L.title;
       if(L.artist) $("artistInput").value = L.artist;
       if(L.wm) $("wmInput").value = L.wm;
       if(L.subs && Array.isArray(L.subs) && L.subs.length){
@@ -6981,17 +6990,17 @@ function init(){
     const rf = store.get("lumatone.rflag");
     if(!rf) return;
     store.set("lumatone.rflag", null);
-    if(S.quality !== 720){
+    const wasLong = rf.dur && rf.dur > 600;
+    // 긴 영상 크래시일 때만 720p 권장 (설정은 이미 위에서 전부 복원됨)
+    if(wasLong && S.quality !== 720){
       S.quality = 720;
       $("qBtn").textContent = "화질 720p";
+      updateDashboard();
     }
-    // 긴 곡이었으면 분할 렌더를 권장
-    const wasLong = rf.dur && rf.dur > 600;
     const msg = wasLong
-      ? "⚠ 이전 렌더가 메모리 부족으로 중단된 것 같습니다. 화질을 720p로 낮췄습니다. 20분 같은 긴 플리는 2~3곡씩 나눠 렌더하면 훨씬 안정적입니다."
-      : "⚠ 이전 렌더 중 메모리 부족으로 재시작된 것 같습니다 — 안정성을 위해 화질을 720p로 낮췄습니다.";
+      ? "⚠ 이전 렌더가 중단됐지만 설정은 그대로 유지됩니다. 긴 영상이라 화질만 720p로 낮췄어요 — 바로 다시 렌더하시면 됩니다. (음원만 다시 선택)"
+      : "⚠ 이전 렌더가 중단됐지만 설정은 그대로 유지됩니다 — 음원만 다시 선택해 이어가세요.";
     toast(msg, 7000);
-    updateDashboard();
   })();
 
   refreshArt(false);
