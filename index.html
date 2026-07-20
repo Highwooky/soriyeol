@@ -32,6 +32,26 @@ header{padding:26px 0 10px}
 
 .step{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin-top:14px}
 .step-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.step.collapsible > .step-head{cursor:pointer;user-select:none;margin-bottom:12px}
+.step.collapsible.collapsed > .step-head{margin-bottom:0}
+.step-caret{margin-left:8px;color:var(--sub);font-size:.8rem;transition:transform .2s;flex:none}
+.step.collapsed .step-caret{transform:rotate(-90deg)}
+.step.collapsed .step-head small{opacity:.7}
+.step-body{overflow:hidden}
+.step.collapsed > .step-body{display:none}
+/* 설정 요약 대시보드 */
+#dashWrap{margin-top:14px}
+.dash{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px}
+.dash h3{font-size:.92rem;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.dashgrid{display:flex;flex-direction:column;gap:9px}
+.dashrow{display:flex;align-items:flex-start;gap:8px;font-size:.8rem;line-height:1.5}
+.dashrow .dk{color:var(--sub);flex:none;width:64px;padding-top:2px}
+.dashvals{display:flex;flex-wrap:wrap;gap:5px;flex:1}
+.dashbadge{background:var(--surface2);border:1px solid var(--line);border-radius:999px;
+  padding:3px 10px;font-size:.74rem;color:var(--text);cursor:pointer;transition:border-color .15s}
+.dashbadge:active{border-color:var(--accent)}
+.dashbadge.accent{border-color:var(--accent);color:var(--accent)}
+.dashbadge.muted{color:var(--sub)}
 .step-num{width:24px;height:24px;border-radius:50%;background:var(--surface2);border:1px solid var(--line);
   color:var(--accent);font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
 .step-num.done{background:var(--accent);color:#06231d;border-color:var(--accent)}
@@ -145,41 +165,62 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
 </header>
 
 <!-- ① 음원 -->
-<section class="step">
-  <div class="step-head"><div class="step-num" id="n1">1</div><h2>음원 불러오기</h2><small>MP3 / WAV / M4A</small></div>
+<section class="step collapsible" data-sec="n1">
+  <div class="step-head"><div class="step-num" id="n1">1</div><h2>음원 불러오기</h2><small>MP3 / WAV / M4A</small><span class="step-caret">▾</span></div>
+  <div class="step-body">
   <div class="dropzone" id="dropzone"><strong>탭해서 음원 선택</strong><br>여러 곡 선택하면 플리 영상 + 유튜브 챕터 자동 생성</div>
   <input type="file" id="audioInput" accept="audio/*,.mp3,.wav,.m4a,.aac,.flac" multiple hidden>
   <div class="filemeta" id="fileMeta"></div>
+</div>
 </section>
 
 <!-- ② 사운드 -->
-<section class="step">
-  <div class="step-head"><div class="step-num" id="n2">2</div><h2>사운드 · 자동 마스터링</h2><small>-14 LUFS 유튜브 기준</small></div>
-  <div class="label">마스터링 프리셋</div>
-  <div class="chips" id="presetChips">
-    <button class="chip on" data-v="clean">클린</button>
-    <button class="chip" data-v="punch">펀치</button>
-    <button class="chip" data-v="warm">웜</button>
-    <button class="chip" data-v="off">노멀라이즈만</button>
+<section class="step collapsible" data-sec="n2">
+  <div class="step-head"><div class="step-num" id="n2">2</div><h2>사운드 · 자동 마스터링</h2><small id="n2sub">유튜브 · -14 LUFS</small><span class="step-caret">▾</span></div>
+  <div class="step-body">
+  <div class="label">장르 <span style="font-weight:400;color:var(--sub)">— 곡에 맞는 톤으로 자동 셰이핑</span></div>
+  <div class="chips" id="genreChips">
+    <button class="chip on" data-v="general">범용</button>
+    <button class="chip" data-v="edm">EDM·댄스</button>
+    <button class="chip" data-v="hiphop">힙합·트랩</button>
+    <button class="chip" data-v="ballad">발라드·어쿠스틱</button>
+    <button class="chip" data-v="rock">록·밴드</button>
+    <button class="chip" data-v="korean">국악·퓨전</button>
+    <button class="chip" data-v="lofi">로파이·앰비언트</button>
+    <button class="chip" data-v="off">보정 안 함</button>
   </div>
-  <div class="label">타깃 라우드니스: <b id="lufsLabel" style="color:var(--text)">-14.0 LUFS</b></div>
-  <input type="range" id="lufsRange" min="-18" max="-9" step="0.5" value="-14">
+  <p id="genreDesc" style="font-size:.72rem;color:var(--sub);line-height:1.5;margin:6px 0 0">장르 불명확하거나 자연스러운 마스터</p>
+
+  <div class="label">배포 플랫폼 <span style="font-weight:400;color:var(--sub)">— 타깃 음량 자동 설정</span></div>
+  <div class="chips" id="platChips">
+    <button class="chip on" data-v="youtube">유튜브</button>
+    <button class="chip" data-v="spotify">Spotify</button>
+    <button class="chip" data-v="apple">Apple Music</button>
+    <button class="chip" data-v="tiktok">틱톡·릴스·쇼츠</button>
+    <button class="chip" data-v="soundcloud">SoundCloud</button>
+    <button class="chip" data-v="club">클럽·라우드</button>
+    <button class="chip" data-v="broadcast">방송 R128</button>
+  </div>
+  <p id="platDesc" style="font-size:.72rem;color:var(--sub);line-height:1.5;margin:6px 0 0">타깃 -14 LUFS · True Peak -1.0 dBTP</p>
+
   <div class="label">마스터링 강도: <b id="amtLabel" style="color:var(--text)">100%</b></div>
   <input type="range" id="amtRange" min="0" max="2" step="0.1" value="1">
   <div class="meter">
     <div class="cell"><div class="v" id="mLufsIn">–</div><div class="k">원본 LUFS</div></div>
     <div class="cell"><div class="v" id="mLufsOut">–</div><div class="k">결과 LUFS</div></div>
-    <div class="cell"><div class="v" id="mPeak">–</div><div class="k">피크 dB</div></div>
+    <div class="cell"><div class="v" id="mPeak">–</div><div class="k">True Peak</div></div>
   </div>
   <div style="margin-top:12px" class="row">
     <button class="btn primary" id="btnProcess" disabled>사운드 적용</button>
     <button class="btn" id="btnWav" disabled>마스터 WAV 저장</button>
   </div>
+</div>
 </section>
 
 <!-- ③ 배경 -->
-<section class="step">
-  <div class="step-head"><div class="step-num" id="n3">3</div><h2>배경 이미지</h2></div>
+<section class="step collapsible" data-sec="n3">
+  <div class="step-head"><div class="step-num" id="n3">3</div><h2>배경 이미지</h2><span class="step-caret">▾</span></div>
+  <div class="step-body">
   <div class="tabs" id="bgTabs">
     <button class="on" data-t="art">생성 아트</button>
     <button data-t="photo">사진</button>
@@ -216,11 +257,13 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
     <p style="font-size:.72rem;color:var(--sub);margin-top:8px;line-height:1.6">Kling·Veo·Pika 등 AI 앱에서 생성해 폰에 저장한 클립을 배경으로 사용하세요. 소리는 제거되고 곡 길이에 맞춰 자동 반복됩니다.</p>
   </div>
   <div style="margin-top:12px"><button class="btn small full" id="btnEditBg">✂️ 배경 편집 — 자르기 · 확대 · 회전</button></div>
+</div>
 </section>
 
 <!-- ④ 화면 -->
-<section class="step">
-  <div class="step-head"><div class="step-num" id="n4">4</div><h2>화면 구성</h2></div>
+<section class="step collapsible" data-sec="n4">
+  <div class="step-head"><div class="step-num" id="n4">4</div><h2>화면 구성</h2><span class="step-caret">▾</span></div>
+  <div class="step-body">
   <div class="label">추천 프리셋 — 원탭으로 조합 적용</div>
   <div class="chips" id="presetLook">
     <button class="chip" data-v="cinematic">시네마틱 감성</button>
@@ -281,6 +324,56 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <input type="text" id="artistInput" placeholder="아티스트명 (비우면 표시 안 함)">
   <div class="label">워터마크 — 우상단 표시 (채널명 등)</div>
   <input type="text" id="wmInput" placeholder="비우면 표시 안 함">
+
+  <div class="label">자막 / 가사 <span style="font-weight:400;color:var(--sub)">— 켜면 아래에서 편집</span></div>
+  <div class="chips" id="subChips">
+    <button class="chip" id="chipSub">자막 사용</button>
+  </div>
+  <div id="subPanel" style="display:none;margin-top:8px">
+    <div class="chips" id="subModeChips">
+      <button class="chip on" data-v="manual">타임라인 입력</button>
+      <button class="chip" data-v="lyrics">가사 자동 분배</button>
+    </div>
+
+    <div id="subManualBox">
+      <p style="font-size:.7rem;color:var(--sub);line-height:1.6;margin:6px 0">
+        한 줄에 하나씩: <b>[시작~끝] 텍스트</b> 형식.<br>
+        예) <code>[0:05~0:09] 첫 번째 자막</code> · 시간은 <code>초</code> 또는 <code>분:초</code>.</p>
+      <textarea id="subManual" rows="5" placeholder="[0:00~0:04] 전주 시작&#10;[0:05~0:09] 첫 소절 가사&#10;[0:10~0:14] 다음 소절" style="width:100%;font-family:monospace;font-size:.8rem"></textarea>
+    </div>
+
+    <div id="subLyricsBox" style="display:none">
+      <p style="font-size:.7rem;color:var(--sub);line-height:1.6;margin:6px 0">
+        가사를 줄 단위로 붙여넣으면 <b>곡 길이에 균등 분배</b>합니다. 이후 타임라인 입력으로 전환하면 자동 생성된 시간을 미세조정할 수 있어요.</p>
+      <textarea id="subLyrics" rows="5" placeholder="한 줄에 한 자막씩 붙여넣기&#10;가사 첫 줄&#10;가사 둘째 줄&#10;가사 셋째 줄" style="width:100%;font-size:.85rem"></textarea>
+      <div class="row" style="margin-top:6px">
+        <label style="font-size:.72rem;color:var(--sub)">시작 <input type="text" id="subLyStart" value="0:00" style="width:56px;font-family:monospace"></label>
+        <label style="font-size:.72rem;color:var(--sub)">끝(비우면 끝까지) <input type="text" id="subLyEnd" placeholder="곡 끝" style="width:56px;font-family:monospace"></label>
+        <button class="chip" id="btnLyricsApply">균등 분배 → 타임라인</button>
+      </div>
+    </div>
+
+    <div class="label">자막 위치</div>
+    <div class="chips" id="subPosChips">
+      <button class="chip" data-v="top">상단</button>
+      <button class="chip" data-v="mid">중앙</button>
+      <button class="chip on" data-v="bottom">하단</button>
+    </div>
+    <div class="label">자막 스타일 <span style="font-weight:400;color:var(--sub)">— 숏폼 트렌드</span></div>
+    <div class="chips" id="subStyleChips">
+      <button class="chip on" data-v="clean">클린 (외곽선)</button>
+      <button class="chip" data-v="box">박스 배경</button>
+      <button class="chip" data-v="pop">단어 팝 ✦</button>
+      <button class="chip" data-v="karaoke">카라오케 채움</button>
+      <button class="chip" data-v="type">타이핑</button>
+      <button class="chip" data-v="bounce">바운스 인</button>
+      <button class="chip" data-v="highlight">형광펜</button>
+    </div>
+    <div class="label">자막 크기: <b id="subScaleLabel" style="color:var(--text)">100%</b></div>
+    <input type="range" id="subScaleRange" min="0.6" max="1.8" step="0.05" value="1">
+    <div style="margin-top:8px"><button class="btn small" id="btnSubParse">자막 적용 · 검사</button>
+      <span id="subCount" style="font-size:.72rem;color:var(--sub);margin-left:8px"></span></div>
+  </div>
   <div class="label">배경 모션</div>
   <div class="chips">
     <button class="chip on" id="chipKb">켄번즈 줌</button>
@@ -339,7 +432,16 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
     <button class="chip on" id="chipProg">진행바 표시</button>
     <button class="chip on" id="chipMonitor">렌더 중 소리</button>
   </div>
+</div>
 </section>
+
+<!-- 설정 요약 대시보드 -->
+<div id="dashWrap">
+  <div class="dash">
+    <h3>📋 설정 요약 <span style="font-weight:400;color:var(--sub);font-size:.74rem">— 배지를 탭하면 해당 설정으로 이동</span></h3>
+    <div class="dashgrid" id="dashGrid"></div>
+  </div>
+</div>
 
 <!-- ⑤ 미리보기 & 렌더 -->
 <section class="step" id="stepRender">
@@ -357,8 +459,8 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
     <button class="btn small" id="btnDiag">🔍 진단 복사</button>
   </div>
   <div class="row" style="margin-top:12px">
-    <button class="chip on" id="chipFastR">⚡ 고속 렌더</button>
-    <span id="fastNote" style="font-size:.7rem;color:var(--sub)">지원 기기에서 2~8배속 · 미지원이면 자동 실시간</span>
+    <button class="chip" id="chipFastR">⚡ 고속 렌더 (실험적)</button>
+    <span id="fastNote" style="font-size:.7rem;color:var(--sub)">기본은 실시간(안정적). 최신 기기에서만 빠를 수 있음</span>
   </div>
   <button class="btn hot full" id="btnRender" style="margin-top:10px" disabled>● 영상 렌더 시작</button>
   <div class="progresswrap" id="progressWrap">
@@ -376,7 +478,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p class="notice" id="renderNote">렌더 중 다른 앱으로 이동하거나 화면을 잠그면 작업이 멈춥니다.</p>
 </section>
 
-<footer>LUMATONE v3.0 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v3.3 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -2321,8 +2423,11 @@ const S = {
   rawBuffer: null,         // (싱글 모드 호환) 원본 AudioBuffer
   procBuffer: null,        // (싱글 모드 호환) 마스터링 완료 AudioBuffer
   fileName: "",
-  preset: "clean",
+  genre: "general",        // 마스터링 장르 (GENRE_CHAINS 키)
+  platform: "youtube",     // 배포 플랫폼 (PLATFORMS 키) — 타깃 LUFS/dBTP 결정
+  preset: "clean",         // (구 호환) — genre로 대체됨
   targetLUFS: -14,
+  truePeak: null,          // 마스터 결과 True Peak (dBTP)
   amount: 1.0,             // 마스터링 강도 (0~2)
   font: "gothic",
   abOriginal: false,       // A/B 비교: true면 원본(음량 매칭) 청취
@@ -2353,6 +2458,9 @@ const S = {
   beatCut: false,          // 플리 슬라이드를 비트에 맞춰 컷 전환
   spot: false, vign: false, hueCycle: false, film: false,
   ridgeHist: null, ridgeLast: 0,
+  subOn: false, subMode: "manual", subPos: "bottom", subStyle: "clean", subScale: 1,
+  subs: [],                // [{start, end, text}] 정렬됨
+  subFont: "gothic",
   fxKick: 0, fxCur: "zoom", glitchN: 0,
   cutIdx: 0, lastCutT: 0,
   vizPeaks: null,          // 피크 바용 피크 홀드
@@ -2360,7 +2468,7 @@ const S = {
   smoothBands: null,
   lpAngle: 0,
   quality: 1080,
-  fastRender: true,        // 고속(WebCodecs) 렌더 사용 — 미지원 시 자동 실시간 폴백
+  fastRender: false,       // 실시간이 기본(안정적). 고속(WebCodecs)은 실험적 옵션
   fastActive: false, fastSkipPreview: false,   // 고속 렌더 중 미리보기 드로우 생략 (속도 ~2배)
   playing: false, rendering: false,
   playNodes: null,         // {src, analyser, gain}
@@ -2390,13 +2498,14 @@ const store = {
 };
 function saveLook(){
   store.set("lumatone.look", {
-    preset:S.preset, targetLUFS:S.targetLUFS, amount:S.amount,
+    genre:S.genre, platform:S.platform, preset:S.preset, targetLUFS:S.targetLUFS, amount:S.amount,
     viz:S.viz, tone:S.tone, accent:S.accent, mood:S.mood, font:S.font, sens:S.sens,
     ratio:S.ratio, quality:S.quality,
     kb:S.kb, pump:S.pump, moodShift:S.moodShift, fade:S.fade, fxOverlay:S.fxOverlay,
     beatFx:S.beatFx, beatCut:S.beatCut,
     spot:S.spot, vign:S.vign, hueCycle:S.hueCycle, film:S.film,
     fastRender:S.fastRender,
+    subOn:S.subOn, subMode:S.subMode, subPos:S.subPos, subStyle:S.subStyle, subScale:S.subScale, subs:S.subs,
     dust:S.dust, cine:S.cine, glowBoost:S.glowBoost, artFlow:S.artFlow,
     vizPos:S.vizPos, vizScale:S.vizScale, textPos:S.textPos, textScale:S.textScale,
     artist: $("artistInput") ? $("artistInput").value : "",
@@ -2434,6 +2543,324 @@ function hueHex(h){
   return "#" + to(r) + to(g) + to(b);
 }
 
+// ============================================================
+// 자막 엔진: 시간코드 파싱 · 가사 균등분배 · 렌더링
+// ============================================================
+// "1:23" / "83" / "1:23.5" → 초
+function parseTimecode(s){
+  s = String(s).trim();
+  if(!s) return null;
+  if(s.includes(":")){
+    const parts = s.split(":").map(p=>parseFloat(p));
+    if(parts.some(isNaN)) return null;
+    return parts.length===3 ? parts[0]*3600+parts[1]*60+parts[2] : parts[0]*60+parts[1];
+  }
+  const v = parseFloat(s);
+  return isNaN(v) ? null : v;
+}
+function fmtTC(sec){
+  const m = Math.floor(sec/60), s = Math.floor(sec%60);
+  return `${m}:${s.toString().padStart(2,"0")}`;
+}
+// "[0:05~0:09] 텍스트" 여러 줄 → 정렬된 큐 배열. {ok, subs, errors}
+function parseManualSubs(text){
+  const subs = [], errors = [];
+  const lines = text.split("\n");
+  const re = /^\s*\[\s*([0-9:.]+)\s*[~\-–]\s*([0-9:.]+)\s*\]\s*(.*)$/;
+  lines.forEach((ln, i)=>{
+    if(!ln.trim()) return;
+    const m = ln.match(re);
+    if(!m){ errors.push(`${i+1}행: 형식 오류 ([시작~끝] 텍스트)`); return; }
+    const st = parseTimecode(m[1]), en = parseTimecode(m[2]);
+    if(st===null || en===null){ errors.push(`${i+1}행: 시간 해석 불가`); return; }
+    if(en <= st){ errors.push(`${i+1}행: 끝이 시작보다 빠름`); return; }
+    subs.push({start:st, end:en, text:m[3].trim()});
+  });
+  subs.sort((a,b)=>a.start-b.start);
+  return {ok: errors.length===0, subs, errors};
+}
+// 가사 줄들을 [start,end] 구간에 균등 분배
+function distributeLyrics(text, startSec, endSec){
+  const lines = text.split("\n").map(l=>l.trim()).filter(Boolean);
+  if(!lines.length) return [];
+  const span = Math.max(0.5, endSec - startSec);
+  const per = span / lines.length;
+  const GAP = Math.min(0.25, per*0.12);   // 자막 사이 짧은 공백
+  return lines.map((t,i)=>({
+    start: +(startSec + per*i).toFixed(2),
+    end:   +(startSec + per*(i+1) - GAP).toFixed(2),
+    text: t,
+  }));
+}
+// 현재 시각 t에서 보여줄 자막 인덱스 (없으면 -1). subs는 정렬 가정
+function activeSubAt(t){
+  const subs = S.subs;
+  for(let i=0;i<subs.length;i++)
+    if(t >= subs[i].start && t < subs[i].end) return i;
+  return -1;
+}
+
+// 자막 렌더링 — 숏폼 스타일 7종. x=ctx, playT=현재 재생 절대시간(초)
+function drawSubtitle(x, w, h, mn, playT){
+  const idx = activeSubAt(playT);
+  if(idx < 0) return;
+  const sub = S.subs[idx];
+  const txt = sub.text;
+  if(!txt) return;
+  const dur = sub.end - sub.start;
+  const local = playT - sub.start;                 // 이 자막 내 경과
+  const prog = dur > 0 ? Math.min(1, local/dur) : 1;
+  const F = FONTS.find(f=>f.id===S.subFont) || FONTS[0];
+  const size = Math.round(h * 0.052 * S.subScale);
+  const y = S.subPos==="top" ? h*0.16 : S.subPos==="mid" ? h*0.52 : h*0.86;
+  const accent = S.accent;
+
+  x.save();
+  x.textAlign = "center";
+  x.textBaseline = "middle";
+  x.font = `${F.w} ${size}px ${F.family}`;
+
+  // 등장/퇴장 페이드 공통 (0.25s)
+  const fadeIn = Math.min(1, local/0.25);
+  const fadeOut = Math.min(1, (sub.end - playT)/0.25);
+  const alpha = Math.max(0, Math.min(fadeIn, fadeOut));
+
+  const style = S.subStyle;
+  const cx = w/2;
+
+  // 외곽선+그림자 헬퍼 (가독성)
+  const stroke = (t, px, py, fs)=>{
+    x.font = `${F.w} ${fs}px ${F.family}`;
+    x.lineJoin = "round";
+    x.lineWidth = Math.max(3, fs*0.14);
+    x.strokeStyle = "rgba(0,0,0,0.85)";
+    x.strokeText(t, px, py);
+  };
+
+  if(style==="clean"){
+    x.globalAlpha = alpha;
+    stroke(txt, cx, y, size);
+    x.fillStyle = "#fff";
+    x.fillText(txt, cx, y);
+  }
+  else if(style==="box"){
+    x.globalAlpha = alpha;
+    const tw = x.measureText(txt).width;
+    const padX = size*0.5, padY = size*0.34;
+    x.fillStyle = "rgba(0,0,0,0.62)";
+    roundRect(x, cx-tw/2-padX, y-size/2-padY, tw+padX*2, size+padY*2, size*0.28);
+    x.fill();
+    x.fillStyle = "#fff";
+    x.fillText(txt, cx, y);
+  }
+  else if(style==="pop"){
+    // 단어별 순차 등장 + 현재 단어 강조 (틱톡 대표 스타일)
+    const words = txt.split(/\s+/);
+    x.font = `${F.w} ${size}px ${F.family}`;
+    const sw = words.map(wd=>x.measureText(wd).width);
+    const space = x.measureText(" ").width;
+    const totalW = sw.reduce((a,b)=>a+b,0) + space*(words.length-1);
+    let wx = cx - totalW/2;
+    const revealPer = dur / Math.max(1, words.length);
+    for(let i=0;i<words.length;i++){
+      const appear = sub.start + revealPer*i;
+      const wl = playT - appear;
+      if(wl < 0){ wx += sw[i] + space; continue; }
+      const pop = Math.min(1, wl/0.18);
+      const scl = 0.6 + 0.4*easeOutBack(pop);
+      const curWord = (i === Math.min(words.length-1, Math.floor(local/revealPer)));
+      const bx = wx + sw[i]/2;
+      x.save();
+      x.translate(bx, y);
+      x.scale(scl, scl);
+      x.globalAlpha = alpha * Math.min(1, wl/0.1);
+      stroke(words[i], 0, 0, size);
+      x.fillStyle = curWord ? accent : "#fff";
+      x.font = `${F.w} ${size}px ${F.family}`;
+      x.fillText(words[i], 0, 0);
+      x.restore();
+      wx += sw[i] + space;
+    }
+  }
+  else if(style==="karaoke"){
+    // 재생 위치까지 색이 차오름 (클리핑으로 좌→우 채움)
+    x.globalAlpha = alpha;
+    stroke(txt, cx, y, size);
+    x.fillStyle = "rgba(255,255,255,0.30)";
+    x.fillText(txt, cx, y);
+    const tw = x.measureText(txt).width;
+    x.save();
+    x.beginPath();
+    x.rect(cx - tw/2, y - size, tw*prog, size*2);
+    x.clip();
+    x.fillStyle = accent;
+    x.fillText(txt, cx, y);
+    x.restore();
+  }
+  else if(style==="type"){
+    // 타이핑: 글자 순차 등장
+    const nCh = Math.max(1, Math.floor(txt.length * Math.min(1, local/(dur*0.6))));
+    const shown = txt.slice(0, nCh);
+    x.globalAlpha = alpha;
+    stroke(shown, cx, y, size);
+    x.fillStyle = "#fff";
+    x.fillText(shown, cx, y);
+    // 커서 깜빡임
+    if(prog < 0.95 && Math.floor(playT*2)%2===0){
+      const tw = x.measureText(shown).width;
+      x.fillRect(cx + tw/2 + size*0.1, y - size*0.42, size*0.08, size*0.84);
+    }
+  }
+  else if(style==="bounce"){
+    // 통통 튀며 등장
+    const b = easeOutBounce(Math.min(1, local/0.5));
+    const yb = y - (1-b)*h*0.06;
+    x.globalAlpha = alpha;
+    x.save();
+    x.translate(cx, yb);
+    const sc = 0.8 + 0.2*b;
+    x.scale(sc, sc);
+    stroke(txt, 0, 0, size);
+    x.fillStyle = "#fff";
+    x.font = `${F.w} ${size}px ${F.family}`;
+    x.fillText(txt, 0, 0);
+    x.restore();
+  }
+  else if(style==="highlight"){
+    // 형광펜 박스 위 검은 글씨
+    x.globalAlpha = alpha;
+    const tw = x.measureText(txt).width;
+    const padX = size*0.34, padY = size*0.2;
+    x.fillStyle = accent;
+    roundRect(x, cx-tw/2-padX, y-size/2-padY, tw+padX*2, size+padY*2, size*0.14);
+    x.fill();
+    x.fillStyle = "#0A0C10";
+    x.fillText(txt, cx, y);
+  }
+
+  x.restore();
+}
+
+// 이징 헬퍼
+function easeOutBack(t){ const c1=1.70158, c3=c1+1; return 1 + c3*Math.pow(t-1,3) + c1*Math.pow(t-1,2); }
+function easeOutBounce(t){
+  const n1=7.5625, d1=2.75;
+  if(t<1/d1) return n1*t*t;
+  if(t<2/d1){ t-=1.5/d1; return n1*t*t+0.75; }
+  if(t<2.5/d1){ t-=2.25/d1; return n1*t*t+0.9375; }
+  t-=2.625/d1; return n1*t*t+0.984375;
+}
+function roundRect(x, rx, ry, rw, rh, r){
+  x.beginPath();
+  x.moveTo(rx+r, ry);
+  x.arcTo(rx+rw, ry, rx+rw, ry+rh, r);
+  x.arcTo(rx+rw, ry+rh, rx, ry+rh, r);
+  x.arcTo(rx, ry+rh, rx, ry, r);
+  x.arcTo(rx, ry, rx+rw, ry, r);
+  x.closePath();
+}
+
+// ============================================================
+// 설정 요약 대시보드 — 현재 선택을 배지로 정리, 탭하면 해당 섹션으로
+// ============================================================
+const VIZ_NAMES = {ring:"장단링",bars:"바",wave:"웨이브",burst:"파티클",aurora:"오로라",
+  mirror:"미러",orbit:"오빗",wavecircle:"웨이브서클",tunnel:"터널",peaks:"피크바",
+  mandala:"만다라",ridge:"리지라인",grid:"LED그리드",helix:"헬릭스",lp:"LP",dots:"별"};
+const FX_NAMES = {none:"없음",zoom:"줌펀치",flash:"플래시",shake:"셰이크",glitch:"글리치",ghost:"고스트",mix:"믹스"};
+const SUBSTYLE_NAMES = {clean:"클린",box:"박스",pop:"단어팝",karaoke:"카라오케",type:"타이핑",bounce:"바운스",highlight:"형광펜"};
+const TONE_NAMES = {none:"기본",warm:"웜",cool:"쿨",mono:"모노"};
+const RATIO_NAMES = {"169":"16:9 가로","916":"9:16 세로","11":"1:1 정방"};
+
+function updateDashboard(){
+  const grid = $("dashGrid");
+  if(!grid) return;
+  const rows = [];   // {key, badges:[{label, accent, muted, sec}]}
+
+  // 음원
+  if(S.tracks.length){
+    const label = S.tracks.length>1 ? `플리 ${S.tracks.length}곡` : (S.tracks[0].title||"1곡");
+    rows.push({key:"음원", badges:[{label, sec:"n1", accent:true}]});
+  }else{
+    rows.push({key:"음원", badges:[{label:"미선택", sec:"n1", muted:true}]});
+  }
+
+  // 사운드
+  const genreLabel = (GENRE_CHAINS[S.genre]||{}).label || (S.genre==="off"?"보정 안 함":S.genre);
+  const platLabel = (PLATFORMS[S.platform]||{}).label || S.platform;
+  rows.push({key:"사운드", badges:[
+    {label:genreLabel, sec:"n2"},
+    {label:platLabel+" "+S.targetLUFS+"LUFS", sec:"n2", muted:true},
+    ...(S.tracks[0]&&S.tracks[0].proc ? [{label:"적용됨", sec:"n2", accent:true}] : [{label:"미적용", sec:"n2", muted:true}]),
+  ]});
+
+  // 배경
+  const bgMap={art:"생성아트",photo:"사진",ai:"AI생성",video:"동영상"};
+  const bgBadges=[{label:bgMap[S.bgMode]||S.bgMode, sec:"n3"}];
+  if(S.slides && S.slides.length>1) bgBadges.push({label:`슬라이드 ${S.slides.length}`, sec:"n3", muted:true});
+  rows.push({key:"배경", badges:bgBadges});
+
+  // 비율/화질
+  rows.push({key:"출력", badges:[
+    {label:RATIO_NAMES[S.ratio]||S.ratio, sec:"n3"},
+    {label:`${S.quality}p`, sec:"n5"},
+    {label:S.fastRender?"고속(실험)":"실시간", sec:"n5", muted:!S.fastRender},
+  ]});
+
+  // 비주얼라이저
+  rows.push({key:"비주얼", badges:[
+    {label:VIZ_NAMES[S.viz]||S.viz, sec:"n4", accent:true},
+    {label:`감도 ${S.sens.toFixed(1)}×`, sec:"n4", muted:true},
+  ]});
+
+  // 이펙트/모션 (켜진 것만)
+  const fxBadges=[];
+  if(S.beatFx!=="none") fxBadges.push({label:"비트:"+(FX_NAMES[S.beatFx]||S.beatFx), sec:"n4", accent:true});
+  if(S.beatCut) fxBadges.push({label:"비트컷", sec:"n4"});
+  if(S.pump) fxBadges.push({label:"펌핑", sec:"n4", muted:true});
+  if(S.spot) fxBadges.push({label:"스포트", sec:"n4", muted:true});
+  if(S.vign) fxBadges.push({label:"비네트", sec:"n4", muted:true});
+  if(S.hueCycle) fxBadges.push({label:"레인보우", sec:"n4", muted:true});
+  if(S.film) fxBadges.push({label:"필름", sec:"n4", muted:true});
+  if(S.glowBoost) fxBadges.push({label:"글로우+", sec:"n4", muted:true});
+  if(S.cine) fxBadges.push({label:"시네마바", sec:"n4", muted:true});
+  if(S.tone!=="none") fxBadges.push({label:"톤:"+TONE_NAMES[S.tone], sec:"n4", muted:true});
+  if(!fxBadges.length) fxBadges.push({label:"기본", sec:"n4", muted:true});
+  rows.push({key:"이펙트", badges:fxBadges});
+
+  // 자막
+  if(S.subOn){
+    rows.push({key:"자막", badges:[
+      {label:SUBSTYLE_NAMES[S.subStyle]||S.subStyle, sec:"n4", accent:true},
+      {label:`${S.subs.length}개`, sec:"n4", muted:true},
+      {label:S.subPos==="top"?"상단":S.subPos==="mid"?"중앙":"하단", sec:"n4", muted:true},
+    ]});
+  }else{
+    rows.push({key:"자막", badges:[{label:"꺼짐", sec:"n4", muted:true}]});
+  }
+
+  grid.innerHTML = rows.map(r=>
+    `<div class="dashrow"><span class="dk">${r.key}</span><span class="dashvals">` +
+    r.badges.map(b=>`<span class="dashbadge${b.accent?' accent':''}${b.muted?' muted':''}" data-sec="${b.sec}">${b.label}</span>`).join("") +
+    `</span></div>`
+  ).join("");
+
+  // 배지 탭 → 해당 섹션 펼치고 스크롤
+  grid.querySelectorAll(".dashbadge").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      const secId = b.dataset.sec;
+      const sec = document.querySelector(`.step[data-sec="${secId}"]`) ||
+                  (secId==="n5" ? $("stepRender") : null);
+      if(!sec) return;
+      if(sec.classList.contains("collapsed")){
+        sec.classList.remove("collapsed");
+        const cs = store.get("lumatone.collapse") || {};
+        cs[secId] = false; store.set("lumatone.collapse", cs);
+      }
+      sec.scrollIntoView({behavior:"smooth", block:"start"});
+    });
+  });
+}
+
 // ---------- 제목 폰트 (선택 시 최초 1회만 로드) ----------
 const FONTS = [
   {id:"gothic",  name:"고딕",   gf:null,                          family:'-apple-system,"Apple SD Gothic Neo",sans-serif', w:800, mul:1.00},
@@ -2446,6 +2873,7 @@ const FONTS = [
 const loadedFonts = new Set(["gothic"]);
 async function selectFont(id){
   const f = FONTS.find(v=>v.id===id) || FONTS[0];
+  S.subFont = id;   // 자막도 같은 폰트 사용
   if(f.gf && !loadedFonts.has(id)){
     try{
       const link = document.createElement("link");
@@ -2572,13 +3000,97 @@ function satCurve(k, mix){
   return c;
 }
 
+// ============================================================
+// True Peak (dBTP) 측정 — 4배 오버샘플링 (ITU-R BS.1770 근사)
+//   샘플간 피크(inter-sample peak)를 잡아 인코딩 후 클리핑을 예방
+// ============================================================
+function measureTruePeak(channels){
+  // 폴리페이즈 4x 업샘플: 짧은 윈드드 sinc (품질/속도 균형)
+  const OS = 4, TAPS = 32;
+  // sinc 커널 사전계산 (Blackman 윈도우) — 각 페이즈 합=1로 정규화 (DC 게인 보존)
+  const kernels = [];
+  for(let p=0;p<OS;p++){
+    const k = new Float32Array(TAPS);
+    let sum = 0;
+    for(let t=0;t<TAPS;t++){
+      const x = (t - TAPS/2 + 1) - p/OS;
+      const s = Math.abs(x)<1e-9 ? 1 : Math.sin(Math.PI*x)/(Math.PI*x);
+      const w = 0.42 - 0.5*Math.cos(2*Math.PI*t/(TAPS-1)) + 0.08*Math.cos(4*Math.PI*t/(TAPS-1));
+      k[t] = s*w; sum += k[t];
+    }
+    for(let t=0;t<TAPS;t++) k[t] /= sum;   // 정규화: 인터폴레이션 게인 = 1
+    kernels.push(k);
+  }
+  let peak = 0;
+  for(const ch of channels){
+    const n = ch.length;
+    // 성능: 신호 전체가 아니라 샘플피크 상위 근방만 정밀 검사하면 되지만,
+    //   정확도 우선 — 다만 스텝을 둬 과도한 비용 방지 (긴 곡)
+    const step = n > 4_000_000 ? 2 : 1;
+    for(let i=0;i<n;i+=step){
+      for(let p=0;p<OS;p++){
+        const ker = kernels[p];
+        let acc = 0;
+        for(let t=0;t<TAPS;t++){
+          const idx = i + t - TAPS/2 + 1;
+          if(idx>=0 && idx<n) acc += ch[idx]*ker[t];
+        }
+        const a = Math.abs(acc);
+        if(a>peak) peak = a;
+      }
+    }
+  }
+  return 20*Math.log10(peak + 1e-12);   // dBTP
+}
+
+// ============================================================
+// 장르별 톤 밸런스 타깃 — Ozone Tonal Balance 발상의 경량 버전
+//   각 장르가 지향하는 EQ 셰이핑(주파수, dB@강도1.0, Q). 강도로 스케일.
+//   [type, freq, gain, q]
+// ============================================================
+const GENRE_CHAINS = {
+  // 범용: 과하지 않은 밸런스 + 살짝의 공기감
+  general: {label:"범용", eq:[["highpass",30,0,0.71],["highshelf",10000,1.2,0.7]],
+    sat:0.35, comp:[-18,2.0,0.010,0.25], desc:"장르 불명확하거나 자연스러운 마스터"},
+  // EDM/댄스: 탄탄한 저역 + 선명한 고역 + 강한 글루
+  edm: {label:"EDM · 댄스", eq:[["highpass",32,0,0.71],["lowshelf",80,2.2,0.7],["peaking",350,-1.5,1.0],["highshelf",9000,2.0,0.7]],
+    sat:0.7, comp:[-20,3.5,0.004,0.12], desc:"묵직한 킥·베이스, 밝고 큰 사운드"},
+  // 힙합/트랩: 서브베이스 강조 + 중역 정리
+  hiphop: {label:"힙합 · 트랩", eq:[["highpass",28,0,0.71],["lowshelf",60,3.0,0.7],["peaking",450,-1.2,1.1],["highshelf",8000,1.2,0.7]],
+    sat:0.55, comp:[-19,3.0,0.006,0.15], desc:"깊은 808 서브, 단단한 저역"},
+  // 발라드/어쿠스틱: 따뜻한 중저역 + 부드러운 고역, 다이내믹 보존
+  ballad: {label:"발라드 · 어쿠스틱", eq:[["highpass",35,0,0.71],["lowshelf",140,1.4,0.7],["peaking",2500,0.8,1.2],["highshelf",11000,-0.8,0.7]],
+    sat:0.9, comp:[-15,1.8,0.020,0.35], desc:"따뜻하고 자연스러운 보컬 중심"},
+  // 록/밴드: 중역 존재감 + 펀치, 아날로그 새추레이션
+  rock: {label:"록 · 밴드", eq:[["highpass",34,0,0.71],["lowshelf",100,1.2,0.7],["peaking",1500,1.5,0.9],["highshelf",7000,1.6,0.7]],
+    sat:1.1, comp:[-17,2.5,0.008,0.20], desc:"기타·드럼의 펀치와 존재감"},
+  // 국악/전통 퓨전: 중고역 배음 보존 + 자연스러운 공간감 (유감독님 콘텐츠)
+  korean: {label:"국악 · 퓨전", eq:[["highpass",30,0,0.71],["lowshelf",110,1.2,0.7],["peaking",3500,1.2,1.1],["highshelf",12000,1.5,0.6]],
+    sat:0.6, comp:[-16,2.0,0.015,0.28], desc:"장단의 타격감과 배음, 자연스러운 울림"},
+  // 로파이/앰비언트: 부드러운 고역 롤오프 + 진한 새추레이션
+  lofi: {label:"로파이 · 앰비언트", eq:[["highpass",30,0,0.71],["lowshelf",150,1.5,0.7],["highshelf",8000,-2.5,0.7]],
+    sat:1.3, comp:[-16,2.2,0.025,0.40], desc:"포근하고 아늑한 질감, 부드러운 고역"},
+};
+
+// 배포 플랫폼별 타깃 라우드니스 (LUFS) + True Peak 실링 (dBTP)
+//   각 플랫폼이 공식 권장하거나 노멀라이즈하는 값
+const PLATFORMS = {
+  youtube:   {label:"유튜브",            lufs:-14, tp:-1.0},
+  spotify:   {label:"Spotify",          lufs:-14, tp:-1.0},
+  apple:     {label:"Apple Music",      lufs:-16, tp:-1.0},
+  tiktok:    {label:"틱톡 · 릴스 · 쇼츠", lufs:-14, tp:-1.0},
+  soundcloud:{label:"SoundCloud",       lufs:-14, tp:-1.0},
+  club:      {label:"클럽 · 라우드 마스터", lufs:-9,  tp:-0.8},
+  broadcast: {label:"방송 (EBU R128)",   lufs:-23, tp:-1.0},
+};
+
 // 마스터링 프리셋 → OfflineAudioContext 그래프 (amount: 0~2 강도 스케일)
-function buildChain(off, src, preset, amount){
+function buildChain(off, src, genre, amount){
   let node = src;
   const eq = (type, f, gain, q) => {
     const n = off.createBiquadFilter();
     n.type = type; n.frequency.value = f;
-    if(gain !== undefined) n.gain.value = gain * amount;   // EQ량은 강도에 비례
+    if(gain !== undefined && gain !== 0) n.gain.value = gain * amount;   // EQ량은 강도 비례
     if(q !== undefined) n.Q.value = q;
     node.connect(n); node = n;
   };
@@ -2591,30 +3103,25 @@ function buildChain(off, src, preset, amount){
     node.connect(c); node = c;
   };
   const sat = (drive) => {
-    const mix = Math.min(1, drive * amount);   // 강도 0 → 믹스 0 = 바이패스
+    const mix = Math.min(1, drive * amount);
     if(mix <= 0.02) return;
     const ws = off.createWaveShaper();
     ws.curve = satCurve(3.0, mix);
-    ws.oversample = "4x";   // 앨리어싱 방지
+    ws.oversample = "4x";
     node.connect(ws); node = ws;
   };
-  eq("highpass", 28, undefined, 0.71);          // 초저역 정리 (모든 프리셋 공통)
-  if(preset === "clean"){ comp(-18, 2, 0.010, 0.25); }
-  else if(preset === "punch"){
-    eq("lowshelf", 90, 1.5); eq("peaking", 300, -1.0, 1.0); eq("highshelf", 8000, 1.5);
-    sat(0.6);
-    comp(-20, 3, 0.005, 0.15);
-  }
-  else if(preset === "warm"){
-    eq("lowshelf", 120, 2.0); eq("highshelf", 10000, -1.0);
-    sat(1.0);
-    comp(-16, 2, 0.015, 0.30);
-  }
+  const G = GENRE_CHAINS[genre] || GENRE_CHAINS.general;
+  // 1) 장르 EQ (톤 밸런스 셰이핑)
+  for(const [type,f,gain,q] of G.eq) eq(type, f, gain, q);
+  // 2) 새추레이션 (배음/글루)
+  sat(G.sat);
+  // 3) 글루 컴프레션
+  comp(G.comp[0], G.comp[1], G.comp[2], G.comp[3]);
   node.connect(off.destination);
 }
 
-// 버퍼를 타깃 LUFS로 노멀라이즈 + 리미팅한 새 버퍼 반환
-function normalizeTo(buffer, targetLUFS){
+// 버퍼를 타깃 LUFS로 노멀라이즈 + True Peak 실링 리미팅. 측정값도 반환
+function normalizeTo(buffer, targetLUFS, tpCeilingDb){
   const lufs = measureLUFS(buffer);
   const gain = Math.pow(10, (targetLUFS - lufs)/20);
   const out = new AudioBuffer({numberOfChannels: buffer.numberOfChannels,
@@ -2625,7 +3132,10 @@ function normalizeTo(buffer, targetLUFS){
     for(let i=0;i<s.length;i++) d[i] = s[i]*gain;
     chans.push(d);
   }
-  limiter(chans, Math.pow(10, -1/20));   // 실링 -1 dBFS
+  // True Peak 실링 (dBTP). 넘으면 리니어 실링으로 리미터 구동
+  const ceilDb = (tpCeilingDb === undefined) ? -1.0 : tpCeilingDb;
+  const ceiling = Math.pow(10, ceilDb/20);
+  limiter(chans, ceiling);
   return out;
 }
 
@@ -2656,11 +3166,13 @@ async function masterOne(buf, projSR){
   const len = Math.round(buf.duration * sr);
   const off = new OfflineAudioContext(2, len, sr);
   const src = off.createBufferSource(); src.buffer = buf;
-  if(S.preset !== "off") buildChain(off, src, S.preset, S.amount);
+  const bypass = (S.genre === "off");
+  if(!bypass) buildChain(off, src, S.genre, S.amount);
   else src.connect(off.destination);   // 패스스루 (리샘플/업믹스만)
   src.start();
   const rendered = await off.startRendering();
-  return normalizeTo(rendered, S.targetLUFS);
+  const plat = PLATFORMS[S.platform] || PLATFORMS.youtube;
+  return normalizeTo(rendered, plat.lufs, plat.tp);
 }
 
 async function processAudio(){
@@ -2685,12 +3197,14 @@ async function processAudio(){
       if(many) t.raw = null;   // 플리: 원본 즉시 해제 (아이폰 메모리 보호)
     }
     recalcOffsets();
+    const plat = PLATFORMS[S.platform] || PLATFORMS.youtube;
+    const bypass = (S.genre === "off");
     // A/B 비교는 싱글 모드에서만 (플리는 메모리상 원본 미보관)
     if(!many){
       S.procBuffer = S.tracks[0].proc;
-      S.rawMatched = (S.preset !== "off") ? normalizeTo(S.tracks[0].raw, S.targetLUFS) : S.procBuffer;
+      S.rawMatched = !bypass ? normalizeTo(S.tracks[0].raw, plat.lufs, plat.tp) : S.procBuffer;
       S.abOriginal = false;
-      $("btnAB").style.display = (S.preset !== "off") ? "inline-flex" : "none";
+      $("btnAB").style.display = !bypass ? "inline-flex" : "none";
       $("btnAB").textContent = "A/B: 마스터";
       $("btnAB").classList.remove("hot");
     }else{
@@ -2699,18 +3213,24 @@ async function processAudio(){
     }
     S.lufsOut = lufsSum / S.tracks.length;
     S.peakOut = db(pkMax);
+    // True Peak (dBTP) — 첫 트랙 기준 (긴 곡 비용 고려, 대표값)
+    const tpChans = [];
+    for(let c=0;c<S.tracks[0].proc.numberOfChannels;c++) tpChans.push(S.tracks[0].proc.getChannelData(c));
+    S.truePeak = measureTruePeak(tpChans);
     $("mLufsOut").textContent = S.lufsOut.toFixed(1);
     $("mLufsOut").className = "v ok";
-    $("mPeak").textContent = S.peakOut.toFixed(1);
-    $("mPeak").className = "v " + (S.peakOut <= -0.8 ? "ok" : "warn");
+    // 타깃 대비 표시
+    $("mPeak").textContent = S.truePeak.toFixed(1);
+    $("mPeak").className = "v " + (S.truePeak <= plat.tp + 0.05 ? "ok" : "warn");
     $("n2").classList.add("done");
     $("btnWav").disabled = many;
     $("btnPreview").disabled = false;
     $("btnRender").disabled = false;
     renderTrackList();
+    updateDashboard();
     toast(many
-      ? `✓ ${S.tracks.length}곡 마스터링 완료 — 총 ${fmtTime(S.totalDur)}`
-      : "✓ 마스터링 완료 — " + S.lufsOut.toFixed(1) + " LUFS");
+      ? `✓ ${S.tracks.length}곡 마스터링 완료 — 총 ${fmtTime(S.totalDur)} · ${plat.label} ${plat.lufs} LUFS`
+      : `✓ 마스터링 완료 — ${S.lufsOut.toFixed(1)} LUFS · ${S.truePeak.toFixed(1)} dBTP (${plat.label})`);
   }catch(err){
     console.error("[LUMATONE] 오디오 처리 실패:", err);
     toast("오디오 처리 실패: " + err.message);
@@ -2826,6 +3346,7 @@ function setSlides(list){
     ? `슬라이드 ${S.slides.length}장 — 곡 진행에 맞춰 크로스페이드`
     : "무료 외부 서비스(Pollinations) · 인터넷 필요 · 실패 시 재시도";
   drawFrame(null);
+  if(typeof updateDashboard==="function") updateDashboard();
 }
 
 function refreshArt(newSeed){
@@ -3739,6 +4260,12 @@ function drawFrame(audio, progress, tOverride){
         x.textAlign = "center";
       }
     }
+    // ---------- 자막 / 가사 ----------
+    if(S.subOn && S.subs.length){
+      // 현재 재생 절대시간: 미리보기/렌더는 p·dur, 아이들 상태는 tSec 폴백
+      const playT = (p !== null && S.curDur > 0) ? p * S.curDur : tSec;
+      drawSubtitle(x, w, h, mn, playT);
+    }
     // ---------- 진행바 ----------
     if(S.showProg && p !== null){
       x.fillStyle="rgba(255,255,255,.18)";
@@ -4581,6 +5108,7 @@ function bindChips(elId, cb){
     for(const c of $(elId).querySelectorAll(".chip")) c.classList.remove("on");
     b.classList.add("on");
     cb(b.dataset.v);
+    if(typeof updateDashboard==="function") updateDashboard();
   });
 }
 
@@ -4652,6 +5180,7 @@ async function onAudioFiles(files){
       $("titleInput").value = S.tracks.length>1 ? "" : S.tracks[0].title;
     $("titleInput").placeholder = S.tracks.length>1 ? "플레이리스트 제목" : "곡 제목";
     drawFrame(null);
+    updateDashboard();
     toast(`✓ ${S.tracks.length}곡 로드 완료 — 평균 ${S.lufsIn.toFixed(1)} LUFS`);
   }catch(err){
     console.error("[LUMATONE] 디코딩 실패:", err);
@@ -4741,7 +5270,7 @@ function init(){
   $("btnDesc").addEventListener("click", copyDescription);
   $("btnDiag").addEventListener("click", async ()=>{
     const info = {
-      app: "LUMATONE v3.0",
+      app: "LUMATONE v3.3",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
@@ -4761,10 +5290,19 @@ function init(){
     deliverFile(S.lastBlob, S.lastName || "output.mp4");
   });
 
-  bindChips("presetChips", v=>{ S.preset=v; });
-  $("lufsRange").addEventListener("input", e=>{
-    S.targetLUFS = parseFloat(e.target.value);
-    $("lufsLabel").textContent = S.targetLUFS.toFixed(1) + " LUFS";
+  bindChips("genreChips", v=>{
+    S.genre = v;
+    const G = GENRE_CHAINS[v];
+    $("genreDesc").textContent = v==="off" ? "원본 톤 유지 — 음량만 타깃에 맞춤" : (G ? G.desc : "");
+  });
+  bindChips("platChips", v=>{
+    S.platform = v;
+    const P = PLATFORMS[v];
+    if(P){
+      S.targetLUFS = P.lufs;
+      $("platDesc").textContent = `타깃 ${P.lufs} LUFS · True Peak ${P.tp.toFixed(1)} dBTP`;
+      $("n2sub").textContent = `${P.label} · ${P.lufs} LUFS`;
+    }
   });
   $("amtRange").addEventListener("input", e=>{
     S.amount = parseFloat(e.target.value);
@@ -4807,6 +5345,7 @@ function init(){
     }
     if(S.bgMode==="art") refreshArt(false);
     else drawFrame(null);
+    updateDashboard();
   });
   $("btnVideo").addEventListener("click", ()=>$("videoInput").click());
   $("videoInput").addEventListener("change", e=>{
@@ -4884,7 +5423,7 @@ function init(){
   edC.addEventListener("pointerup", edUp);
   edC.addEventListener("pointercancel", edUp);
 
-  bindChips("ratioChips", v=>{ S.ratio=v; setRatioCanvas(); });
+  bindChips("ratioChips", v=>{ S.ratio=v; updateDashboard(); setRatioCanvas(); });
   bindChips("vizChips", v=>{ S.viz=v; drawFrame(null); });
   $("swatches").addEventListener("click", e=>{
     const s = e.target.closest(".sw"); if(!s) return;
@@ -4898,8 +5437,67 @@ function init(){
     S[key] = !S[key];
     $(id).classList.toggle("on", S[key]);
     drawFrame(null);
+    updateDashboard();
   });
   toggle("chipText","showText");
+
+  // ---------- 자막 배선 ----------
+  $("chipSub").addEventListener("click", ()=>{
+    S.subOn = !S.subOn;
+    $("chipSub").classList.toggle("on", S.subOn);
+    $("subPanel").style.display = S.subOn ? "block" : "none";
+    if(!S.playing && !S.rendering) drawFrame(null);
+    updateDashboard();
+  });
+  bindChips("subModeChips", v=>{
+    S.subMode = v;
+    $("subManualBox").style.display = v==="manual" ? "block" : "none";
+    $("subLyricsBox").style.display = v==="lyrics" ? "block" : "none";
+  });
+  bindChips("subPosChips", v=>{ S.subPos=v; if(!S.playing && !S.rendering) drawFrame(null); });
+  bindChips("subStyleChips", v=>{ S.subStyle=v; if(!S.playing && !S.rendering) drawFrame(null); });
+  $("subScaleRange").addEventListener("input", e=>{
+    S.subScale = parseFloat(e.target.value);
+    $("subScaleLabel").textContent = Math.round(S.subScale*100)+"%";
+    if(!S.playing && !S.rendering) drawFrame(null);
+  });
+  $("btnLyricsApply").addEventListener("click", ()=>{
+    const txt = $("subLyrics").value;
+    if(!txt.trim()){ toast("가사를 먼저 붙여넣어 주세요"); return; }
+    const st = parseTimecode($("subLyStart").value) ?? 0;
+    let en = parseTimecode($("subLyEnd").value);
+    if(en===null || en<=st){
+      en = S.curDur > 0 ? S.curDur : (S.tracks[0] ? S.tracks[0].raw.duration : st+60);
+    }
+    const dist = distributeLyrics(txt, st, en);
+    if(!dist.length){ toast("분배할 가사가 없습니다"); return; }
+    // 타임라인 텍스트로 변환해 수동 입력창에 채우고 모드 전환
+    const lines = dist.map(s=>`[${fmtTC(s.start)}~${fmtTC(s.end)}] ${s.text}`).join("\n");
+    $("subManual").value = lines;
+    S.subs = dist;
+    for(const c of $("subModeChips").querySelectorAll(".chip"))
+      c.classList.toggle("on", c.dataset.v==="manual");
+    S.subMode = "manual";
+    $("subManualBox").style.display = "block";
+    $("subLyricsBox").style.display = "none";
+    $("subCount").textContent = `${dist.length}개 자막 균등 분배됨 (미세조정 가능)`;
+    toast(`✓ ${dist.length}개 자막을 ${fmtTC(st)}~${fmtTC(en)} 구간에 분배`, 3500);
+    if(!S.playing && !S.rendering) drawFrame(null);
+  });
+  // ---------- 아코디언 섹션 접기/펴기 ----------
+  const collapseState = store.get("lumatone.collapse") || {n1:false, n2:true, n3:true, n4:true};
+  document.querySelectorAll(".step.collapsible").forEach(sec=>{
+    const id = sec.dataset.sec;
+    if(collapseState[id]) sec.classList.add("collapsed");
+    sec.querySelector(".step-head").addEventListener("click", ()=>{
+      sec.classList.toggle("collapsed");
+      collapseState[id] = sec.classList.contains("collapsed");
+      store.set("lumatone.collapse", collapseState);
+    });
+  });
+
+  // ---------- 설정 요약 대시보드 ----------
+  updateDashboard();
   toggle("chipProg","showProg");
   toggle("chipMonitor","monitor");
   toggle("chipKb","kb");
@@ -4957,6 +5555,7 @@ function init(){
     }
     if(S.bgMode==="art"){ S.mood = L.mood; syncChip("moodChips", L.mood); refreshArt(true); }
     else drawFrame(null);
+    updateDashboard();
     toast("✓ 프리셋 적용됨 — 미리듣기로 확인해보세요");
   });
 
@@ -5052,12 +5651,14 @@ function init(){
   $("sensRange").addEventListener("input", e=>{
     S.sens = parseFloat(e.target.value);
     $("sensLabel").textContent = S.sens.toFixed(1) + "×";
+    updateDashboard();
   });
 
   $("qBtn").addEventListener("click", ()=>{
     if(S.rendering) return;
     S.quality = S.quality===1080 ? 720 : 1080;
     $("qBtn").textContent = "화질 " + S.quality + "p";
+    updateDashboard();
   });
   $("btnPreview").addEventListener("click", ()=> S.playing ? stopPreview() : startPreview());
   $("btnRender").addEventListener("click", startRender);
@@ -5068,15 +5669,16 @@ function init(){
     if(S.rendering) return;
     S.fastRender = !S.fastRender;
     $("chipFastR").classList.toggle("on", S.fastRender);
+    updateDashboard();
   });
   checkFastSupport().then(ok=>{
     if(!ok){
       S.fastRender = false;
       $("chipFastR").style.display = "none";
       $("fastNote").textContent = "이 기기는 실시간 렌더만 지원합니다 (iOS 16.4+ 권장)";
-      $("renderNote").textContent = "이 기기는 실시간 렌더 모드입니다: 곡 길이만큼 걸립니다 (3분 곡 = 약 3분). 렌더 중 다른 앱 이동·화면 잠금 시 녹화가 멈춥니다.";
+      $("renderNote").textContent = "실시간 렌더: 곡 길이만큼 걸립니다 (3분 곡 = 약 3분). 렌더 중 다른 앱 이동·화면 잠금 시 녹화가 멈춥니다.";
     }else{
-      $("renderNote").textContent = "⚡ 고속 렌더: 곡 길이보다 빠르게 완료됩니다. 화질을 720p로 낮추면 속도가 크게 오르고 메모리도 안정적입니다 (긴 곡·플리 권장). 렌더 중 화면은 켜둔 채 앱에 머물러주세요.";
+      $("renderNote").textContent = "실시간 렌더가 기본입니다 (안정적, 곡 길이만큼 소요). ⚡ 고속 렌더는 실험적 기능으로, 최신 기기가 아니면 오히려 느릴 수 있습니다. 렌더 중 화면은 켜둔 채 앱에 머물러주세요.";
     }
   });
 
@@ -5090,11 +5692,16 @@ function init(){
     const L = store.get("lumatone.look");
     if(!L) return;
     try{
-      if(L.preset){ S.preset = L.preset; syncChip("presetChips", L.preset); }
-      if(typeof L.targetLUFS === "number"){
-        S.targetLUFS = L.targetLUFS;
-        $("lufsRange").value = L.targetLUFS;
-        $("lufsLabel").textContent = L.targetLUFS.toFixed(1) + " LUFS";
+      if(L.genre && GENRE_CHAINS[L.genre]){
+        S.genre = L.genre; syncChip("genreChips", L.genre);
+        $("genreDesc").textContent = L.genre==="off" ? "원본 톤 유지 — 음량만 타깃에 맞춤" : GENRE_CHAINS[L.genre].desc;
+      }
+      if(L.platform && PLATFORMS[L.platform]){
+        S.platform = L.platform; syncChip("platChips", L.platform);
+        const P = PLATFORMS[L.platform];
+        S.targetLUFS = P.lufs;
+        $("platDesc").textContent = `타깃 ${P.lufs} LUFS · True Peak ${P.tp.toFixed(1)} dBTP`;
+        $("n2sub").textContent = `${P.label} · ${P.lufs} LUFS`;
       }
       if(typeof L.amount === "number"){
         S.amount = L.amount;
@@ -5150,6 +5757,7 @@ function init(){
         setRatioCanvas();
       }
     }catch(err){ console.warn("[LUMATONE] 설정 복원 일부 실패:", err); }
+    updateDashboard();   // 복원된 설정을 요약에 반영
   })();
 
   // 이전 세션이 렌더 중 비정상 종료(메모리 크래시)됐는지 감지
