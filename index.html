@@ -143,12 +143,15 @@ input[type=text]:focus{border-color:var(--accent)}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 #previewCanvas.dragmode{touch-action:none;outline:1.5px dashed var(--accent);outline-offset:-1.5px}
 #miniWrap{position:fixed;right:12px;bottom:calc(env(safe-area-inset-bottom) + 14px);z-index:60;
-  border-radius:12px;overflow:hidden;border:1px solid var(--line);
-  box-shadow:0 6px 24px rgba(0,0,0,.55);display:none;background:#000;cursor:pointer}
+  border-radius:12px;overflow:hidden;border:1.5px solid var(--accent);
+  box-shadow:0 8px 30px rgba(0,0,0,.6);display:none;background:#000;cursor:pointer}
 #miniWrap.show{display:block}
-#miniCanvas{display:block}
-#miniWrap .minilabel{position:absolute;left:0;right:0;bottom:0;font-size:.58rem;text-align:center;
-  color:#fff;background:rgba(0,0,0,.45);padding:2px 0;pointer-events:none}
+#miniCanvas{display:block;width:44vw;max-width:280px;height:auto}
+#miniWrap.big #miniCanvas{width:72vw;max-width:460px}
+#miniWrap .minilabel{position:absolute;left:0;right:0;bottom:0;font-size:.62rem;text-align:center;
+  color:#fff;background:rgba(0,0,0,.5);padding:3px 0;pointer-events:none}
+#miniSize{position:absolute;top:5px;right:5px;width:26px;height:26px;border-radius:8px;
+  background:rgba(0,0,0,.55);color:#fff;border:none;font-size:.85rem;cursor:pointer;z-index:2;line-height:1}
 #editWrap{position:fixed;inset:0;z-index:80;background:rgba(8,10,14,.97);display:none;
   flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:14px}
 #editWrap.open{display:flex}
@@ -335,6 +338,18 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <div class="subpane" data-p="text">
   <div class="label">제목 폰트 <span style="font-weight:400;color:var(--sub)">— 기본 외엔 최초 1회 인터넷</span></div>
   <div class="fontgrid" id="fontChips"></div>
+  <div class="label">제목 색상 스타일</div>
+  <div class="chips" id="titleThemeChips">
+    <button class="chip on" data-v="white">화이트</button>
+    <button class="chip" data-v="broadcast">방송자막</button>
+    <button class="chip" data-v="yellow">예능 노랑</button>
+    <button class="chip" data-v="neon">네온</button>
+    <button class="chip" data-v="pink">핑크팝</button>
+    <button class="chip" data-v="gold">골드</button>
+    <button class="chip" data-v="mint">민트</button>
+    <button class="chip" data-v="black">블랙</button>
+    <button class="chip" data-v="accent">포인트색</button>
+  </div>
   <div class="label">곡 제목</div>
   <input type="text" id="titleInput" placeholder="곡 제목">
   <div class="label">아티스트 / 부제</div>
@@ -369,9 +384,10 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
         <p style="font-size:.7rem;color:var(--sub);line-height:1.5;margin:0 0 8px">노래를 들으며 각 가사가 <b>시작되는 순간</b> 탭 버튼을 누르세요. 마지막 줄까지 누르면 완성됩니다.</p>
         <button class="btn small full" id="btnTapStart">▶ 탭 싱크 시작</button>
         <div id="tapSyncBox" style="display:none;margin-top:8px">
-          <div style="text-align:center;font-size:.74rem;color:var(--sub);margin-bottom:6px">
-            <b id="tapNextLine" style="color:var(--accent);font-size:.95rem">–</b><br>
-            <span id="tapProgress" style="font-size:.68rem"></span>
+          <div style="text-align:center;margin-bottom:6px">
+            <div id="tapPrevLine" style="font-size:.8rem;color:var(--sub);min-height:1.1em">🎧 준비 — 첫 가사가 나오면 탭</div>
+            <div id="tapNextLine" style="color:var(--accent);font-size:1.05rem;font-weight:700;min-height:1.3em">–</div>
+            <div id="tapProgress" style="font-size:.68rem;color:var(--sub);margin-top:2px"></div>
           </div>
           <button class="btn hot full" id="btnTapHit" style="font-size:1.05rem;padding:16px">지금 이 가사 시작! (탭)</button>
           <div class="row" style="margin-top:6px">
@@ -411,6 +427,18 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
       <button class="chip" data-v="type">타이핑</button>
       <button class="chip" data-v="bounce">바운스 인</button>
       <button class="chip" data-v="highlight">형광펜</button>
+    </div>
+    <div class="label">자막 색상 테마 <span style="font-weight:400;color:var(--sub)">— 폰트·효과와 별개</span></div>
+    <div class="chips" id="subThemeChips">
+      <button class="chip on" data-v="white">화이트</button>
+      <button class="chip" data-v="broadcast">방송자막</button>
+      <button class="chip" data-v="yellow">예능 노랑</button>
+      <button class="chip" data-v="neon">네온</button>
+      <button class="chip" data-v="pink">핑크팝</button>
+      <button class="chip" data-v="gold">골드</button>
+      <button class="chip" data-v="mint">민트</button>
+      <button class="chip" data-v="black">블랙</button>
+      <button class="chip" data-v="accent">포인트색</button>
     </div>
     <div class="label">자막 크기: <b id="subScaleLabel" style="color:var(--text)">100%</b></div>
     <input type="range" id="subScaleRange" min="0.6" max="1.8" step="0.05" value="1">
@@ -531,7 +559,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p class="notice" id="renderNote">렌더 중 다른 앱으로 이동하거나 화면을 잠그면 작업이 멈춥니다.</p>
 </section>
 
-<footer>LUMATONE v3.4 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v3.5 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -548,7 +576,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
     <button class="btn small primary" id="edApply">✓ 적용</button>
   </div>
 </div>
-<div id="miniWrap"><canvas id="miniCanvas" width="176" height="99"></canvas><div class="minilabel">탭하면 미리보기로</div></div>
+<div id="miniWrap"><button id="miniSize" title="크게/작게">⤢</button><canvas id="miniCanvas" width="176" height="99"></canvas><div class="minilabel">탭하면 미리보기로</div></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -2513,7 +2541,8 @@ const S = {
   ridgeHist: null, ridgeLast: 0,
   subOn: false, subMode: "manual", subPos: "bottom", subStyle: "clean", subScale: 1,
   subs: [],                // [{start, end, text}] 정렬됨
-  subFont: "gothic", subY: 0,
+  subFont: "gothic", subY: 0, subTheme: "white",
+  titleTheme: "white",
   tapSync: null,           // 탭 싱크 진행 상태
   fxKick: 0, fxCur: "zoom", glitchN: 0,
   cutIdx: 0, lastCutT: 0,
@@ -2560,7 +2589,7 @@ function saveLook(){
     spot:S.spot, vign:S.vign, hueCycle:S.hueCycle, film:S.film,
     fastRender:S.fastRender,
     subOn:S.subOn, subMode:S.subMode, subPos:S.subPos, subStyle:S.subStyle, subScale:S.subScale, subs:S.subs,
-    subFont:S.subFont, subY:S.subY,
+    subFont:S.subFont, subY:S.subY, subTheme:S.subTheme, titleTheme:S.titleTheme,
     dust:S.dust, cine:S.cine, glowBoost:S.glowBoost, artFlow:S.artFlow,
     vizPos:S.vizPos, vizScale:S.vizScale, textPos:S.textPos, textScale:S.textScale,
     artist: $("artistInput") ? $("artistInput").value : "",
@@ -2655,6 +2684,19 @@ function activeSubAt(t){
   return -1;
 }
 
+// 자막/제목 색상 테마 — 폰트·애니메이션과 별개로 색·외곽선·강조 조합
+const TEXT_THEMES = {
+  white:   {label:"화이트",    fill:"#ffffff", outline:"rgba(0,0,0,0.85)", ow:1.0, accent:null,      shadow:true},
+  broadcast:{label:"방송자막",  fill:"#ffffff", outline:"rgba(0,0,0,0.95)", ow:1.4, accent:"#FFD84D", shadow:true},
+  yellow:  {label:"예능 노랑",  fill:"#FFE14D", outline:"rgba(30,20,0,0.95)",ow:1.3, accent:"#ffffff", shadow:true},
+  neon:    {label:"네온",      fill:"#3EF0C8", outline:"rgba(0,40,32,0.9)", ow:1.0, accent:"#FF5FA2", shadow:true, glow:true},
+  pink:    {label:"핑크팝",    fill:"#FF6FB5", outline:"rgba(255,255,255,0.95)",ow:1.2, accent:"#FFE14D", shadow:true},
+  gold:    {label:"골드",      fill:"#E8C874", outline:"rgba(20,12,0,0.9)",  ow:1.1, accent:"#ffffff", shadow:true},
+  mint:    {label:"민트",      fill:"#B8F2E6", outline:"rgba(0,30,26,0.85)", ow:1.0, accent:"#5B8CFF", shadow:true},
+  black:   {label:"블랙",      fill:"#111418", outline:"rgba(255,255,255,0.95)",ow:1.3, accent:"#E8603C", shadow:false},
+  accent:  {label:"포인트색",  fill:null,      outline:"rgba(0,0,0,0.85)", ow:1.0, accent:"#ffffff", shadow:true},
+};
+
 // 자막 렌더링 — 숏폼 스타일 7종. x=ctx, playT=현재 재생 절대시간(초)
 function drawSubtitle(x, w, h, mn, playT){
   const idx = activeSubAt(playT);
@@ -2684,19 +2726,28 @@ function drawSubtitle(x, w, h, mn, playT){
   const style = S.subStyle;
   const cx = w/2;
 
-  // 외곽선+그림자 헬퍼 (가독성)
+  // 색상 테마 해석 (폰트·애니메이션과 독립)
+  const TH = TEXT_THEMES[S.subTheme] || TEXT_THEMES.white;
+  const fillCol = TH.fill || S.accent;               // accent 테마면 포인트색
+  const accentCol = TH.accent || S.accent;           // 강조 단어색
+  const outlineCol = TH.outline;
+  const owMul = TH.ow;
+
+  // 외곽선+그림자 헬퍼 (가독성) — 테마 외곽선색·두께 반영
   const stroke = (t, px, py, fs)=>{
     x.font = `${F.w} ${fs}px ${F.family}`;
     x.lineJoin = "round";
-    x.lineWidth = Math.max(3, fs*0.14);
-    x.strokeStyle = "rgba(0,0,0,0.85)";
+    x.lineWidth = Math.max(3, fs*0.14) * owMul;
+    x.strokeStyle = outlineCol;
+    if(TH.glow){ x.shadowColor = fillCol; x.shadowBlur = fs*0.3; }
     x.strokeText(t, px, py);
+    x.shadowBlur = 0;
   };
 
   if(style==="clean"){
     x.globalAlpha = alpha;
     stroke(txt, cx, y, size);
-    x.fillStyle = "#fff";
+    x.fillStyle = fillCol;
     x.fillText(txt, cx, y);
   }
   else if(style==="box"){
@@ -2706,7 +2757,7 @@ function drawSubtitle(x, w, h, mn, playT){
     x.fillStyle = "rgba(0,0,0,0.62)";
     roundRect(x, cx-tw/2-padX, y-size/2-padY, tw+padX*2, size+padY*2, size*0.28);
     x.fill();
-    x.fillStyle = "#fff";
+    x.fillStyle = fillCol;
     x.fillText(txt, cx, y);
   }
   else if(style==="pop"){
@@ -2731,7 +2782,7 @@ function drawSubtitle(x, w, h, mn, playT){
       x.scale(scl, scl);
       x.globalAlpha = alpha * Math.min(1, wl/0.1);
       stroke(words[i], 0, 0, size);
-      x.fillStyle = curWord ? accent : "#fff";
+      x.fillStyle = curWord ? accentCol : fillCol;
       x.font = `${F.w} ${size}px ${F.family}`;
       x.fillText(words[i], 0, 0);
       x.restore();
@@ -2749,7 +2800,7 @@ function drawSubtitle(x, w, h, mn, playT){
     x.beginPath();
     x.rect(cx - tw/2, y - size, tw*prog, size*2);
     x.clip();
-    x.fillStyle = accent;
+    x.fillStyle = accentCol;
     x.fillText(txt, cx, y);
     x.restore();
   }
@@ -2759,7 +2810,7 @@ function drawSubtitle(x, w, h, mn, playT){
     const shown = txt.slice(0, nCh);
     x.globalAlpha = alpha;
     stroke(shown, cx, y, size);
-    x.fillStyle = "#fff";
+    x.fillStyle = fillCol;
     x.fillText(shown, cx, y);
     // 커서 깜빡임
     if(prog < 0.95 && Math.floor(playT*2)%2===0){
@@ -2777,7 +2828,7 @@ function drawSubtitle(x, w, h, mn, playT){
     const sc = 0.8 + 0.2*b;
     x.scale(sc, sc);
     stroke(txt, 0, 0, size);
-    x.fillStyle = "#fff";
+    x.fillStyle = fillCol;
     x.font = `${F.w} ${size}px ${F.family}`;
     x.fillText(txt, 0, 0);
     x.restore();
@@ -2787,7 +2838,7 @@ function drawSubtitle(x, w, h, mn, playT){
     x.globalAlpha = alpha;
     const tw = x.measureText(txt).width;
     const padX = size*0.34, padY = size*0.2;
-    x.fillStyle = accent;
+    x.fillStyle = accentCol;
     roundRect(x, cx-tw/2-padX, y-size/2-padY, tw+padX*2, size+padY*2, size*0.14);
     x.fill();
     x.fillStyle = "#0A0C10";
@@ -4301,13 +4352,25 @@ function drawFrame(audio, progress, tOverride){
         const F = FONTS.find(f=>f.id===S.font) || FONTS[0];
         const TS = S.textScale;
         const tx = w*S.textPos.x, ty = h*S.textPos.y;
-        x.textAlign="center"; x.fillStyle="#fff";
+        const TT = TEXT_THEMES[S.titleTheme] || TEXT_THEMES.white;
+        const tFill = TT.fill || S.accent;
+        const tSize = Math.round(h*0.055*F.mul*TS);
+        x.textAlign="center";
+        x.font = `${F.w} ${tSize}px ${F.family}`;
+        // 외곽선 (테마별) — 방송자막 룩 등
+        if(TT.ow > 0){
+          x.lineJoin="round"; x.lineWidth=Math.max(2, tSize*0.09)*TT.ow;
+          x.strokeStyle=TT.outline;
+          if(TT.glow){ x.shadowColor=tFill; x.shadowBlur=tSize*0.3; }
+          x.strokeText(title, tx, ty);
+          x.shadowBlur=0;
+        }
+        x.fillStyle=tFill;
         x.shadowColor="rgba(0,0,0,.6)"; x.shadowBlur=h*0.01; x.shadowOffsetY=h*0.003;
-        x.font = `${F.w} ${Math.round(h*0.055*F.mul*TS)}px ${F.family}`;
         x.fillText(title, tx, ty);
         if(artist){
           x.font = `${Math.min(F.w,500)} ${Math.round(h*0.028*Math.min(F.mul,1.2)*TS)}px ${F.family}`;
-          x.fillStyle="rgba(255,255,255,.75)";
+          x.fillStyle = TT.fill ? "rgba(255,255,255,.75)" : tFill;
           x.fillText(artist, tx, Math.min(h*0.985, ty + h*0.048*TS));
         }
         x.shadowBlur=0; x.shadowOffsetY=0;
@@ -5336,7 +5399,7 @@ function init(){
   $("btnDesc").addEventListener("click", copyDescription);
   $("btnDiag").addEventListener("click", async ()=>{
     const info = {
-      app: "LUMATONE v3.4",
+      app: "LUMATONE v3.5",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
@@ -5411,14 +5474,18 @@ function init(){
   function tapRefresh(){
     const ts = S.tapSync; if(!ts) return;
     const lines = ts.lines;
+    const prevEl = $("tapPrevLine"), nextEl = $("tapNextLine");
     if(ts.idx >= lines.length){
-      $("tapNextLine").textContent = "✓ 모든 가사 완료!";
+      prevEl.textContent = lines[lines.length-1] || "";
+      nextEl.textContent = "✓ 모든 가사 완료!";
       $("tapProgress").textContent = `${lines.length}/${lines.length}`;
       $("btnTapHit").disabled = true;
       return;
     }
-    $("tapNextLine").textContent = lines[ts.idx];
-    $("tapProgress").textContent = `${ts.idx}/${lines.length} 기록됨 · 다음 가사가 시작될 때 탭`;
+    // 이전(방금 찍은) 자막 표시 — 싱크 리듬 잡기 용이
+    prevEl.textContent = ts.idx > 0 ? "✓ " + lines[ts.idx-1] : "🎧 준비 — 첫 가사가 나오면 탭";
+    nextEl.textContent = lines[ts.idx];
+    $("tapProgress").textContent = `${ts.idx}/${lines.length} 기록됨 · 다음 가사 시작에 탭`;
     $("btnTapHit").disabled = false;
   }
   $("btnTapStart").addEventListener("click", ()=>{
@@ -5618,6 +5685,8 @@ function init(){
   });
   bindChips("subPosChips", v=>{ S.subPos=v; if(!S.playing && !S.rendering) drawFrame(null); });
   bindChips("subStyleChips", v=>{ S.subStyle=v; if(!S.playing && !S.rendering) drawFrame(null); });
+  bindChips("subThemeChips", v=>{ S.subTheme=v; if(!S.playing && !S.rendering) drawFrame(null); });
+  bindChips("titleThemeChips", v=>{ S.titleTheme=v; if(!S.playing && !S.rendering) drawFrame(null); });
   $("subScaleRange").addEventListener("input", e=>{
     S.subScale = parseFloat(e.target.value);
     $("subScaleLabel").textContent = Math.round(S.subScale*100)+"%";
@@ -5766,6 +5835,10 @@ function init(){
   $("miniWrap").addEventListener("click", ()=>{
     document.querySelector(".previewbox").scrollIntoView({behavior:"smooth", block:"center"});
   });
+  $("miniSize").addEventListener("click", e=>{
+    e.stopPropagation();   // 크기 토글 시 스크롤 이동 방지
+    $("miniWrap").classList.toggle("big");
+  });
 
   // ---------- 배치 조정: 미리보기 드래그 ----------
   bindChips("dragChips", v=>{
@@ -5884,6 +5957,8 @@ function init(){
         for(const el of $("subFontChips").querySelectorAll(".fontchip")) el.classList.toggle("on", el.dataset.v===L.subFont);
       }
       if(L.subStyle){ S.subStyle = L.subStyle; syncChip("subStyleChips", L.subStyle); }
+      if(L.subTheme){ S.subTheme = L.subTheme; syncChip("subThemeChips", L.subTheme); }
+      if(L.titleTheme){ S.titleTheme = L.titleTheme; syncChip("titleThemeChips", L.titleTheme); }
       if(L.subPos){ S.subPos = L.subPos; syncChip("subPosChips", L.subPos); }
       if(typeof L.subScale === "number"){
         S.subScale = L.subScale;
