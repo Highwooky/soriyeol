@@ -127,6 +127,17 @@ input[type=text]:focus{border-color:var(--accent)}
 .previewbox{position:relative;border-radius:14px;overflow:hidden;background:#000;margin-top:4px}
 #previewCanvas{display:block;width:100%}
 .prevctl{display:flex;gap:8px;margin-top:10px}
+/* 상단 고정 미리보기 독 */
+#prevDock{position:sticky;top:0;z-index:40;background:var(--bg);
+  padding:8px 0 10px;margin:0 -2px 6px;border-bottom:1px solid var(--line)}
+#prevDock .previewbox{margin-top:0;display:flex;justify-content:center;background:#000}
+#prevDock #previewCanvas{max-height:38vh;width:auto;max-width:100%;display:block}
+#prevDock.collapsed .previewbox{display:none}
+#prevDockBar{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+#prevDockBar .dtitle{font-size:.76rem;font-weight:700;color:var(--sub);flex:1}
+#prevDockBar button{background:var(--surface2);border:1px solid var(--line);color:var(--text);
+  border-radius:8px;padding:5px 12px;font-size:.74rem;font-weight:600;cursor:pointer}
+#prevDock.collapsed #prevDockToggle{color:var(--accent)}
 
 .progresswrap{display:none;margin-top:14px}
 .pbar{height:8px;background:var(--surface2);border-radius:99px;overflow:hidden}
@@ -142,16 +153,6 @@ input[type=text]:focus{border-color:var(--accent)}
   font-size:.85rem;opacity:0;transition:.3s;z-index:99;max-width:90vw;text-align:center;cursor:pointer}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 #previewCanvas.dragmode{touch-action:none;outline:1.5px dashed var(--accent);outline-offset:-1.5px}
-#miniWrap{position:fixed;right:12px;bottom:calc(env(safe-area-inset-bottom) + 14px);z-index:60;
-  border-radius:12px;overflow:hidden;border:1.5px solid var(--accent);
-  box-shadow:0 8px 30px rgba(0,0,0,.6);display:none;background:#000;cursor:pointer}
-#miniWrap.show{display:block}
-#miniCanvas{display:block;width:44vw;max-width:280px;height:auto}
-#miniWrap.big #miniCanvas{width:72vw;max-width:460px}
-#miniWrap .minilabel{position:absolute;left:0;right:0;bottom:0;font-size:.62rem;text-align:center;
-  color:#fff;background:rgba(0,0,0,.5);padding:3px 0;pointer-events:none}
-#miniSize{position:absolute;top:5px;right:5px;width:26px;height:26px;border-radius:8px;
-  background:rgba(0,0,0,.55);color:#fff;border:none;font-size:.85rem;cursor:pointer;z-index:2;line-height:1}
 #editWrap{position:fixed;inset:0;z-index:80;background:rgba(8,10,14,.97);display:none;
   flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:14px}
 #editWrap.open{display:flex}
@@ -161,7 +162,6 @@ input[type=text]:focus{border-color:var(--accent)}
 #edZoom{width:min(90vw,420px);accent-color:var(--accent)}
 .edhint{font-size:.72rem;color:var(--sub);text-align:center}
 body.renderlock .step:not(#stepRender){opacity:.45;pointer-events:none}
-body.renderlock #miniWrap{pointer-events:none}
 #dimWrap{position:fixed;inset:0;z-index:95;background:#000;display:none;
   flex-direction:column;align-items:center;justify-content:center;gap:10px}
 #dimWrap.open{display:flex}
@@ -178,6 +178,15 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <div class="brand"><h1>LUMA<em>TONE</em></h1><span>루마톤 · MV MAKER</span></div>
   <p class="tagline">음원 하나로 마스터링부터 비주얼라이저 영상까지, 아이폰 안에서 전부.</p>
 </header>
+
+<!-- 상단 고정 미리보기 독 -->
+<div id="prevDock">
+  <div id="prevDockBar">
+    <span class="dtitle">미리보기</span>
+    <button id="prevDockToggle">접기 ▲</button>
+  </div>
+  <div class="previewbox"><canvas id="previewCanvas" width="960" height="540"></canvas></div>
+</div>
 
 <!-- ① 음원 -->
 <section class="step collapsible" data-sec="n1">
@@ -372,6 +381,16 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
         한 줄에 하나씩: <b>[시작~끝] 텍스트</b> 형식.<br>
         예) <code>[0:05~0:09] 첫 번째 자막</code> · 시간은 <code>초</code> 또는 <code>분:초</code>.</p>
       <textarea id="subManual" rows="5" placeholder="[0:00~0:04] 전주 시작&#10;[0:05~0:09] 첫 소절 가사&#10;[0:10~0:14] 다음 소절" style="width:100%;font-family:monospace;font-size:.8rem"></textarea>
+      <div style="background:var(--surface2);border-radius:10px;padding:8px;margin-top:6px">
+        <div style="font-size:.72rem;color:var(--sub);margin-bottom:6px">⏩ 전체 타이밍 일괄 조정 <span id="subShiftInfo"></span></div>
+        <div class="row" style="gap:4px;flex-wrap:nowrap">
+          <button class="chip" data-shift="-0.5">−0.5s</button>
+          <button class="chip" data-shift="-0.1">−0.1s</button>
+          <button class="chip" data-shift="0.1">+0.1s</button>
+          <button class="chip" data-shift="0.5">+0.5s</button>
+        </div>
+        <p style="font-size:.66rem;color:var(--sub);margin:6px 0 0">− = 자막을 앞당김(빨리), + = 뒤로 미룸(늦게). 먼저 "자막 적용"을 누른 뒤 조정하세요.</p>
+      </div>
     </div>
 
     <div id="subLyricsBox" style="display:none">
@@ -527,7 +546,6 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
 <!-- ⑤ 미리보기 & 렌더 -->
 <section class="step" id="stepRender">
   <div class="step-head"><div class="step-num" id="n5">5</div><h2>미리보기 · 렌더</h2></div>
-  <div class="previewbox"><canvas id="previewCanvas" width="960" height="540"></canvas></div>
   <div class="prevctl">
     <button class="btn" id="btnPreview" disabled>▶ 미리듣기</button>
     <button class="btn" id="btnAB" style="display:none">A/B: 마스터</button>
@@ -559,7 +577,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p class="notice" id="renderNote">렌더 중 다른 앱으로 이동하거나 화면을 잠그면 작업이 멈춥니다.</p>
 </section>
 
-<footer>LUMATONE v3.5 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v3.6 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -576,7 +594,6 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
     <button class="btn small primary" id="edApply">✓ 적용</button>
   </div>
 </div>
-<div id="miniWrap"><button id="miniSize" title="크게/작게">⤢</button><canvas id="miniCanvas" width="176" height="99"></canvas><div class="minilabel">탭하면 미리보기로</div></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -2676,6 +2693,19 @@ function distributeLyrics(text, startSec, endSec){
     text: t,
   }));
 }
+// 전체 자막 타임코드를 일괄 이동 (delta초). 0 미만은 0으로 클램프
+function shiftSubs(delta){
+  if(!S.subs.length) return false;
+  S.subs = S.subs.map(s=>({
+    start: Math.max(0, +(s.start+delta).toFixed(2)),
+    end:   Math.max(0.1, +(s.end+delta).toFixed(2)),
+    text: s.text,
+  }));
+  // 타임라인 텍스트도 갱신
+  $("subManual").value = S.subs.map(s=>`[${fmtTC(s.start)}~${fmtTC(s.end)}] ${s.text}`).join("\n");
+  return true;
+}
+
 // 현재 시각 t에서 보여줄 자막 인덱스 (없으면 -1). subs는 정렬 가정
 function activeSubAt(t){
   const subs = S.subs;
@@ -4518,12 +4548,6 @@ function drawFrame(audio, progress, tOverride){
   }
   if(S.glitchN > 0) S.glitchN--;
   S.accent = accentSaved;   // 레인보우 글로우 오버라이드 복원
-  // ---------- 플로팅 미니 미리보기 (본 미리보기가 화면 밖일 때) ----------
-  const miniWrap = $("miniWrap");
-  if(miniWrap && miniWrap.classList.contains("show") && !(S.fastActive && S.fastSkipPreview)){
-    const mini = $("miniCanvas");
-    mini.getContext("2d").drawImage(pv, 0, 0, mini.width, mini.height);
-  }
   // 유휴 상태의 설정 변경을 자동 저장 (모든 UI 변경은 drawFrame(null)을 거침)
   if(!S.playing && !S.rendering) scheduleSave();
 }
@@ -5243,10 +5267,9 @@ function bindChips(elId, cb){
 
 function setRatioCanvas(){
   const pv = $("previewCanvas");
-  const mini = $("miniCanvas");
-  if(S.ratio==="916"){ pv.width=540; pv.height=960; mini.width=84;  mini.height=149; }
-  else if(S.ratio==="11"){ pv.width=720; pv.height=720; mini.width=118; mini.height=118; }
-  else { pv.width=960; pv.height=540; mini.width=176; mini.height=99; }
+  if(S.ratio==="916"){ pv.width=540; pv.height=960; }
+  else if(S.ratio==="11"){ pv.width=720; pv.height=720; }
+  else { pv.width=960; pv.height=540; }
   if(S.bgMode==="art") refreshArt(false);
   else drawFrame(null);
 }
@@ -5399,7 +5422,7 @@ function init(){
   $("btnDesc").addEventListener("click", copyDescription);
   $("btnDiag").addEventListener("click", async ()=>{
     const info = {
-      app: "LUMATONE v3.5",
+      app: "LUMATONE v3.6",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
@@ -5715,6 +5738,37 @@ function init(){
     toast(`✓ ${dist.length}개 자막을 ${fmtTC(st)}~${fmtTC(en)} 구간에 분배`, 3500);
     if(!S.playing && !S.rendering) drawFrame(null);
   });
+
+  // 자막 적용·검사
+  $("btnSubParse").addEventListener("click", ()=>{
+    const res = parseManualSubs($("subManual").value);
+    S.subs = res.subs;
+    if(res.errors.length){
+      $("subCount").textContent = `${res.subs.length}개 인식 · 오류 ${res.errors.length}건`;
+      toast("⚠ " + res.errors.slice(0,3).join(" / "), 5000);
+    }else{
+      $("subCount").textContent = `${res.subs.length}개 자막 정상`;
+      let overlap = 0;
+      for(let i=1;i<res.subs.length;i++) if(res.subs[i].start < res.subs[i-1].end) overlap++;
+      toast(overlap ? `✓ ${res.subs.length}개 인식 (겹침 ${overlap}건 — 뒤 자막 우선)` : `✓ ${res.subs.length}개 자막 적용 완료`, 3500);
+    }
+    if(!S.playing && !S.rendering) drawFrame(null);
+    updateDashboard();
+  });
+
+  // 자막 일괄 시프트
+  let shiftTotal = 0;
+  $("subManualBox").addEventListener("click", e=>{
+    const b = e.target.closest("[data-shift]"); if(!b) return;
+    if(!S.subs.length){ toast("먼저 '자막 적용'을 눌러 자막을 등록하세요"); return; }
+    const d = parseFloat(b.dataset.shift);
+    if(shiftSubs(d)){
+      shiftTotal = +(shiftTotal + d).toFixed(1);
+      $("subShiftInfo").textContent = shiftTotal===0 ? "" : `(누적 ${shiftTotal>0?"+":""}${shiftTotal}s)`;
+      if(!S.playing && !S.rendering) drawFrame(null);
+      updateDashboard();
+    }
+  });
   // ---------- 아코디언 섹션 접기/펴기 ----------
   const collapseState = store.get("lumatone.collapse") || {n1:false, n2:true, n3:true, n4:true};
   document.querySelectorAll(".step.collapsible").forEach(sec=>{
@@ -5825,19 +5879,11 @@ function init(){
     toast("↺ 화면 구성이 기본값으로 초기화되었습니다");
   });
 
-  // ---------- 플로팅 미니 미리보기: 본 미리보기가 안 보일 때만 표시 ----------
-  const io = new IntersectionObserver(entries=>{
-    const visible = entries[0].isIntersecting;
-    $("miniWrap").classList.toggle("show", !visible);
-    if(!visible && !S.playing && !S.rendering) drawFrame(null);   // 표시 직후 1회 갱신
-  }, {threshold: 0.12});
-  io.observe(document.querySelector(".previewbox"));
-  $("miniWrap").addEventListener("click", ()=>{
-    document.querySelector(".previewbox").scrollIntoView({behavior:"smooth", block:"center"});
-  });
-  $("miniSize").addEventListener("click", e=>{
-    e.stopPropagation();   // 크기 토글 시 스크롤 이동 방지
-    $("miniWrap").classList.toggle("big");
+  // ---------- 상단 고정 미리보기 독: 접기/펼기 ----------
+  $("prevDockToggle").addEventListener("click", ()=>{
+    const dock = $("prevDock");
+    const collapsed = dock.classList.toggle("collapsed");
+    $("prevDockToggle").textContent = collapsed ? "펼치기 ▼" : "접기 ▲";
   });
 
   // ---------- 배치 조정: 미리보기 드래그 ----------
