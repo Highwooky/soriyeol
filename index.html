@@ -669,7 +669,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p style="font-size:.7rem;color:var(--sub);line-height:1.5;margin:6px 0 0">아주 긴 플리를 나눠서 렌더한 경우, 만든 영상들을 순서대로 선택하면 하나로 이어붙입니다 (앱 안에서 처리, 다른 프로그램 불필요). 같은 화질·비율로 만든 영상끼리 합치세요.</p>
 </section>
 
-<footer>LUMATONE v5.1 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v5.2 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -5536,6 +5536,7 @@ async function fastRender(){
   if(S.bgMode==="video" && S.bgVideo){ S.bgVideo.currentTime = 0; S.bgVideo.play().catch(()=>{}); }
 
   let ve=null, ae=null, encErr=null;
+  let opfsHandle = null, opfsWritable = null;   // finally에서 정리하기 위해 상위 스코프에 선언
   const DG = {mode:"fast", w:W, h:H, sr:projSR, dur:+dur.toFixed(1), tracks:S.tracks.length,
     codec:null, vChunks:0, aChunks:0, aBytes:0, adts:false, descFrom:null, descHex:null,
     vVideo:null, vAudio:null, fail:null,
@@ -5557,11 +5558,39 @@ async function fastRender(){
     }
     if(!codec) throw new Error("지원되는 H.264 프로파일 없음");
     DG.codec = codec;
-    // fastStart:false → 샘플을 즉시 버퍼에 쓰고 원본 참조를 해제(sample.data=null)해
-    //   메모리를 점진적으로 회수한다. in-memory는 전 샘플을 끝까지 들고 있어 긴 영상에서 크래시.
-    //   (moov가 파일 끝에 위치 — 로컬 재생·업로드에는 지장 없음)
+    // ── 저장 타겟 결정 ──
+    // 긴 영상(6분+)은 OPFS 파일로 직접 스트리밍 → 메모리에 전체 MP4를 안 만듦 (22분 크래시 근본 해결)
+    // 짧은 영상은 기존 ArrayBuffer (빠름)
+    let target;
+    const useOpfs = dur > 360 && !!(navigator.storage && navigator.storage.getDirectory);
+    if(useOpfs){
+      try{
+        const root = await navigator.storage.getDirectory();
+        // 이전 렌더의 잔여 OPFS 파일 정리 (저장공간 누적 방지)
+        try{
+          for await (const [nm, h] of root.entries()){
+            if(nm.startsWith("lumatone_") && nm.endsWith(".mp4")){
+              try{ await root.removeEntry(nm); }catch(e){}
+            }
+          }
+        }catch(e){}
+        // 렌더마다 고유 파일명 — 결과 Blob이 참조하는 동안 이전 파일과 충돌 방지
+        opfsHandle = await root.getFileHandle("lumatone_"+Date.now()+".mp4", {create:true});
+        opfsWritable = await opfsHandle.createWritable();
+        target = new Mp4Muxer.FileSystemWritableFileStreamTarget(opfsWritable);
+        DG.target = "opfs";
+      }catch(e){
+        console.warn("[LUMATONE] OPFS 사용 불가, 메모리 타겟으로 전환:", e.message);
+        target = new Mp4Muxer.ArrayBufferTarget();
+        DG.target = "arraybuffer(opfs실패)";
+      }
+    }else{
+      target = new Mp4Muxer.ArrayBufferTarget();
+      DG.target = "arraybuffer";
+    }
+    // fastStart:false → 샘플을 즉시 타겟에 쓰고 원본 참조 해제. moov는 파일 끝(스트리밍 호환).
     const muxer = new Mp4Muxer.Muxer({
-      target: new Mp4Muxer.ArrayBufferTarget(),
+      target,
       video: {codec:"avc", width:W, height:H},
       audio: {codec:"aac", sampleRate:projSR, numberOfChannels:2},
       fastStart: false,
@@ -5690,10 +5719,19 @@ async function fastRender(){
       await ve.flush(); await ae.flush();
       try{ ve.close(); }catch(e){} try{ ae.close(); }catch(e){}   // 인코더 즉시 해제로 메모리 회수
       muxer.finalize();
-      let buffer = muxer.target.buffer;
-      muxer.target.buffer = null;   // muxer 내부 참조 먼저 해제
-      const blob = new Blob([buffer], {type:"video/mp4"});
-      buffer = null;   // Blob이 데이터를 소유하므로 원본 ArrayBuffer 즉시 해제 → GC 회수
+      let blob;
+      if(opfsWritable){
+        // OPFS 스트리밍: 디스크 파일을 닫고 File(Blob)로 참조 — 메모리에 전체 로드 안 함
+        await opfsWritable.close();
+        opfsWritable = null;   // finally 중복 close 방지
+        const file = await opfsHandle.getFile();
+        blob = file;   // File은 Blob 하위타입, 디스크 기반이라 메모리 부담 없음
+      }else{
+        let buffer = muxer.target.buffer;
+        muxer.target.buffer = null;
+        blob = new Blob([buffer], {type:"video/mp4"});
+        buffer = null;
+      }
       const speed = DG.speed;
       const playable = await verifyPlayable(blob);   // 영상 트랙 검증 (가벼움)
       // 긴 영상은 전체 오디오 디코딩을 피하고 재생 기반 판정 (메모리 폭발 방지)
@@ -5713,6 +5751,7 @@ async function fastRender(){
           toast(`✓ 렌더 완료 — ${speed.toFixed(1)}배속 · ${(blob.size/1048576).toFixed(1)} MB (오디오는 재생해 확인하세요)`, 4500);
       }
     }else{
+      if(opfsWritable){ try{ await opfsWritable.close(); }catch(e){} }
       endRenderUI();
       if(encErr){
         console.error("[LUMATONE] 고속 렌더 인코더 오류:", encErr);
@@ -5729,6 +5768,8 @@ async function fastRender(){
     S.fastActive = false; S.fastSkipPreview = false;
     try{ if(ve && ve.state!=="closed") ve.close(); }catch(e){}
     try{ if(ae && ae.state!=="closed") ae.close(); }catch(e){}
+    // OPFS 쓰기 스트림이 열려있으면 닫기 (오류 경로 대비)
+    if(opfsWritable){ try{ await opfsWritable.close(); }catch(e){} }
   }
 }
 
@@ -6063,7 +6104,7 @@ function init(){
     let last = S.diag;
     if(!last){ try{ last = store.get("lumatone.lastdiag"); }catch(e){} }
     const info = {
-      app: "LUMATONE v5.1",
+      app: "LUMATONE v5.2",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
