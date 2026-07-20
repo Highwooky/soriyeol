@@ -144,6 +144,7 @@ input[type=text]:focus{border-color:var(--accent)}
 #prevDockPlay{background:var(--accent) !important;color:#0A0C10 !important;border-color:var(--accent) !important}
 #prevDockPlay.playing{background:var(--surface2) !important;color:var(--text) !important;border-color:var(--line) !important}
 #autoExpandChip.on{background:var(--accent) !important;color:#0A0C10 !important;border-color:var(--accent) !important}
+#prevDockAB.hot{background:var(--hot) !important;color:#fff !important;border-color:var(--hot) !important}
 #prevDock.collapsed #prevDockToggle{color:var(--accent)}
 
 .progresswrap{display:none;margin-top:14px}
@@ -191,6 +192,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <div id="prevDockBar">
     <span class="dtitle">미리보기</span>
     <button id="autoExpandChip" title="스크롤 자동 펼침">⇕ 자동</button>
+    <button id="prevDockAB" style="display:none" title="마스터링 전/후 비교">A/B</button>
     <button id="prevDockPlay">▶ 미리듣기</button>
     <button id="prevDockToggle">접기 ▲</button>
   </div>
@@ -495,9 +497,13 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   </div>
 
   <div class="subpane" data-p="effect">
-  <div class="label">⚡ 비트 이펙트 <span style="font-weight:400;color:var(--sub)">— 비트마다 자동 발동</span></div>
+  <div class="label">⚡ 비트 이펙트 <span style="font-weight:400;color:var(--sub)">— 여러 개 선택 시 번갈아 발동</span></div>
+  <div class="row" style="gap:6px;margin-bottom:6px">
+    <button class="chip" id="fxSelAll">전체 선택</button>
+    <button class="chip" id="fxSelNone">모두 해제</button>
+    <span id="fxSelCount" style="font-size:.72rem;color:var(--sub);align-self:center"></span>
+  </div>
   <div class="chips" id="beatFxChips">
-    <button class="chip on" data-v="none">없음</button>
     <button class="chip" data-v="zoom">줌 펀치</button>
     <button class="chip" data-v="flash">플래시</button>
     <button class="chip" data-v="shake">셰이크</button>
@@ -516,7 +522,6 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
     <button class="chip" data-v="invert">인버트 플래시</button>
     <button class="chip" data-v="hearts">하트 파티클</button>
     <button class="chip" data-v="sparkle">스파클</button>
-    <button class="chip hot" data-v="mix">믹스 ✦</button>
   </div>
   <div class="label">이펙트 강도: <b id="fxIntLabel" style="color:var(--text)">강 (140%)</b></div>
   <input type="range" id="fxIntRange" min="0.5" max="3" step="0.1" value="1.4">
@@ -621,7 +626,6 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <div class="step-head"><div class="step-num" id="n5">5</div><h2>미리보기 · 렌더</h2></div>
   <div class="prevctl">
     <button class="btn" id="btnPreview" disabled>▶ 미리듣기</button>
-    <button class="btn" id="btnAB" style="display:none">A/B: 마스터</button>
     <div style="margin-left:auto"></div>
     <button class="btn small" id="qBtn" data-v="1080">화질 1080p</button>
   </div>
@@ -648,9 +652,17 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
 🔇 <b>미리보기에서 소리가 안 들리면 측면 무음 스위치를 확인하세요</b> — 무음 모드에선 웹 영상 소리가 재생되지 않습니다 (파일에는 정상 포함).</p>
   </div>
   <p class="notice" id="renderNote">렌더 중 다른 앱으로 이동하거나 화면을 잠그면 작업이 멈춥니다.</p>
+
+  <div class="label" style="margin-top:16px">💾 프로젝트 저장 / 불러오기 <span style="font-weight:400;color:var(--sub)">— 설정만 (음원 제외)</span></div>
+  <div class="row">
+    <button class="btn small" id="btnProjSave">프로젝트 저장</button>
+    <button class="btn small" id="btnProjLoad">불러오기</button>
+    <input type="file" id="projInput" accept=".lumatone,.json,application/json" hidden>
+  </div>
+  <p style="font-size:.7rem;color:var(--sub);line-height:1.5;margin:6px 0 0">비주얼·이펙트·마스터링·자막 등 모든 설정을 파일로 저장합니다. 음원은 용량 때문에 포함되지 않으니, 불러온 뒤 같은 음원을 다시 선택하세요.</p>
 </section>
 
-<footer>LUMATONE v4.3 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v4.4 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -2625,7 +2637,9 @@ const S = {
   sens: 1.0,
   curDur: 0,
   bassAvg: 0.05, beatPulse: 0, beatCool: 0,
-  beatFx: "none",          // none|zoom|flash|shake|glitch|ghost|mix — 비트마다 자동 발동
+  beatFx: "none",          // (구 호환) 단일 이펙트 문자열
+  fxSel: [],               // 선택된 이펙트 목록 (다중 선택). 비면 발동 안 함
+  fxRotate: 0,             // 순환 인덱스
   beatCut: false,          // 플리 슬라이드를 비트에 맞춰 컷 전환
   spot: false, vign: false, hueCycle: false, film: false,
   ridgeHist: null, ridgeLast: 0,
@@ -2681,7 +2695,7 @@ function saveLook(){
     viz:S.viz, tone:S.tone, accent:S.accent, mood:S.mood, font:S.font, sens:S.sens,
     ratio:S.ratio, quality:S.quality,
     kb:S.kb, pump:S.pump, moodShift:S.moodShift, fade:S.fade, fxOverlay:S.fxOverlay,
-    beatFx:S.beatFx, beatCut:S.beatCut,
+    beatFx:S.beatFx, beatCut:S.beatCut, fxSel:S.fxSel,
     spot:S.spot, vign:S.vign, hueCycle:S.hueCycle, film:S.film,
     fastRender:S.fastRender,
     subOn:S.subOn, subMode:S.subMode, subPos:S.subPos, subStyle:S.subStyle, subScale:S.subScale, subs:S.subs,
@@ -3032,7 +3046,10 @@ function updateDashboard(){
 
   // 이펙트/모션 (켜진 것만)
   const fxBadges=[];
-  if(S.beatFx!=="none") fxBadges.push({label:"비트:"+(FX_NAMES[S.beatFx]||S.beatFx), sec:"n4", accent:true});
+  if(S.fxSel && S.fxSel.length){
+    const lbl = S.fxSel.length===1 ? "비트:"+(FX_NAMES[S.fxSel[0]]||S.fxSel[0]) : `비트이펙트 ${S.fxSel.length}종`;
+    fxBadges.push({label:lbl, sec:"n4", accent:true});
+  }
   if(S.beatCut) fxBadges.push({label:"비트컷", sec:"n4"});
   if(S.pump) fxBadges.push({label:"펌핑", sec:"n4", muted:true});
   if(S.spot) fxBadges.push({label:"스포트", sec:"n4", muted:true});
@@ -3432,12 +3449,12 @@ async function processAudio(){
       S.procBuffer = S.tracks[0].proc;
       S.rawMatched = !bypass ? normalizeTo(S.tracks[0].raw, plat.lufs, plat.tp) : S.procBuffer;
       S.abOriginal = false;
-      $("btnAB").style.display = !bypass ? "inline-flex" : "none";
-      $("btnAB").textContent = "A/B: 마스터";
-      $("btnAB").classList.remove("hot");
+      $("prevDockAB").style.display = !bypass ? "inline-block" : "none";
+      $("prevDockAB").textContent = "A/B";
+      $("prevDockAB").classList.remove("hot");
     }else{
       S.procBuffer = null; S.rawMatched = null;
-      $("btnAB").style.display = "none";
+      $("prevDockAB").style.display = "none";
     }
     S.lufsOut = lufsSum / S.tracks.length;
     S.peakOut = db(pkMax);
@@ -3831,12 +3848,10 @@ function updateBeat(bass, dt, tSec){
       S.lastBpmPhase = phase;
       S.beatPulse = 1;
       if(S.viz==="burst") spawnBurst(0.7);
-      if(S.beatFx !== "none"){
+      if(S.fxSel.length > 0){
         S.fxKick = 1;
-        const opts = ["zoom","flash","shake","glitch","ghost","rgbsplit","zoomblur","strobe","spin","vhs","chroma","mirror","kaleido","stretch","prism","invert","hearts","sparkle"];
-        S.fxCur = S.beatFx==="mix"
-          ? opts[phase % opts.length]   // 박자 순서대로 순환 (결정론적)
-          : S.beatFx;
+        // 여러 개 선택 시 박자 순서대로 순환 (결정론적), 하나면 그것만
+        S.fxCur = S.fxSel.length===1 ? S.fxSel[0] : S.fxSel[phase % S.fxSel.length];
         if(S.fxCur==="glitch") S.glitchN = 8;
       }
       if(S.beatCut && S.slides.length>1){
@@ -3861,13 +3876,11 @@ function updateBeat(bass, dt, tSec){
   if(bass > S.bassAvg*thresh + floorAdd && S.beatCool<=0 && bass>minBass){
     S.beatPulse = 1; S.beatCool = cooldown;
     if(S.viz==="burst") spawnBurst(Math.min(1, bass));
-    // 비트 이펙트 발동 (믹스는 시드 난수로 결정론적 선택 → 고속 렌더에서도 동일)
-    if(S.beatFx !== "none"){
+    // 비트 이펙트 발동 (다중 선택 시 시드 난수로 결정론적 선택 → 고속 렌더에서도 동일)
+    if(S.fxSel.length > 0){
       S.fxKick = 1;
-      const opts = ["zoom","flash","shake","glitch","ghost","rgbsplit","zoomblur","strobe","spin","vhs","chroma","mirror","kaleido","stretch","prism","invert","hearts","sparkle"];
-      S.fxCur = S.beatFx==="mix"
-        ? opts[Math.floor(mulberry32(1+Math.floor(tSec*997))()*opts.length)]
-        : S.beatFx;
+      S.fxCur = S.fxSel.length===1 ? S.fxSel[0]
+        : S.fxSel[Math.floor(mulberry32(1+Math.floor(tSec*997))()*S.fxSel.length)];
       if(S.fxCur==="glitch") S.glitchN = 8;
     }
     // 비트 컷: 플리 슬라이드를 비트에 맞춰 하드 컷 전환 (최소 1.2초 간격)
@@ -5725,7 +5738,7 @@ async function onAudioFiles(files){
   if(!list.length) return;
   stopPreview();
   S.tracks = []; S.procBuffer = null; S.rawBuffer = null; S.rawMatched = null;
-  $("btnAB").style.display = "none";
+  $("prevDockAB").style.display = "none";
   try{
     let lufsSum = 0;
     for(let i=0;i<list.length;i++){
@@ -5847,7 +5860,7 @@ function init(){
   $("btnDesc").addEventListener("click", copyDescription);
   $("btnDiag").addEventListener("click", async ()=>{
     const info = {
-      app: "LUMATONE v4.3",
+      app: "LUMATONE v4.4",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
@@ -5986,10 +5999,10 @@ function init(){
     S.tapSync = null;
   });
 
-  $("btnAB").addEventListener("click", ()=>{
+  $("prevDockAB").addEventListener("click", ()=>{
     S.abOriginal = !S.abOriginal;
-    $("btnAB").textContent = "A/B: " + (S.abOriginal ? "원본" : "마스터");
-    $("btnAB").classList.toggle("hot", S.abOriginal);
+    $("prevDockAB").textContent = S.abOriginal ? "원본▶" : "마스터▶";
+    $("prevDockAB").classList.toggle("hot", S.abOriginal);
     if(S.playing && S.playNodes && S.playNodes.gAB){
       // 재생 중이면 30ms 크로스페이드로 즉시 전환 (클릭 노이즈 방지)
       const t = getCtx().currentTime + 0.03;
@@ -6270,7 +6283,32 @@ function init(){
   toggle("chipVign","vign");
   toggle("chipHue","hueCycle");
   toggle("chipFilm","film");
-  bindChips("beatFxChips", v=>{ S.beatFx=v; if(!S.playing && !S.rendering) drawFrame(null); });
+  const ALL_FX = ["zoom","flash","shake","glitch","ghost","rgbsplit","zoomblur","strobe","spin","vhs","chroma","mirror","kaleido","stretch","prism","invert","hearts","sparkle"];
+  function refreshFxSel(){
+    for(const c of $("beatFxChips").querySelectorAll(".chip"))
+      c.classList.toggle("on", S.fxSel.includes(c.dataset.v));
+    const n = S.fxSel.length;
+    $("fxSelCount").textContent = n===0 ? "선택 없음 (이펙트 꺼짐)" : n===1 ? "1개 (항상 발동)" : `${n}개 번갈아 발동`;
+    S.beatFx = n===0 ? "none" : (n===1 ? S.fxSel[0] : "mix");   // 구 호환·대시보드용
+  }
+  $("beatFxChips").addEventListener("click", e=>{
+    const b = e.target.closest(".chip"); if(!b) return;
+    const v = b.dataset.v;
+    const i = S.fxSel.indexOf(v);
+    if(i>=0) S.fxSel.splice(i,1); else S.fxSel.push(v);
+    refreshFxSel();
+    if(!S.playing && !S.rendering) drawFrame(null);
+    updateDashboard();
+  });
+  $("fxSelAll").addEventListener("click", ()=>{
+    S.fxSel = [...ALL_FX]; refreshFxSel();
+    if(!S.playing && !S.rendering) drawFrame(null); updateDashboard();
+    toast("전체 이펙트 선택 — 박자마다 번갈아 터집니다", 2500);
+  });
+  $("fxSelNone").addEventListener("click", ()=>{
+    S.fxSel = []; refreshFxSel();
+    if(!S.playing && !S.rendering) drawFrame(null); updateDashboard();
+  });
   const fxLabel = v => v>=2 ? "최강" : v>=1.3 ? "강" : v>=0.9 ? "보통" : "약";
   $("fxIntRange").addEventListener("input", e=>{
     S.fxIntensity = parseFloat(e.target.value);
@@ -6375,7 +6413,12 @@ function init(){
     const L = LOOKS[id]; if(!L) return;
     S.viz = L.viz;       syncChip("vizChips", L.viz);
     S.tone = L.tone;     syncChip("toneChips", L.tone);
-    S.beatFx = L.beatFx; syncChip("beatFxChips", L.beatFx);
+    S.beatFx = L.beatFx;
+    // beatFx 문자열 → fxSel 배열 변환 (mix=전체, none=없음, 그 외=단일)
+    if(L.beatFx==="mix") S.fxSel = [...ALL_FX];
+    else if(L.beatFx==="none") S.fxSel = [];
+    else S.fxSel = [L.beatFx];
+    refreshFxSel();
     S.accent = L.accent;
     for(const el of $("swatches").querySelectorAll(".sw"))
       el.classList.toggle("on", el.dataset.v===L.accent);
@@ -6427,7 +6470,7 @@ function init(){
     const D = LOOK_DEFAULTS;
     S.viz = D.viz;   syncChip("vizChips", D.viz);
     S.tone = D.tone; syncChip("toneChips", D.tone);
-    S.beatFx = D.beatFx; syncChip("beatFxChips", D.beatFx);
+    S.beatFx = D.beatFx; S.fxSel = []; refreshFxSel();
     S.font = D.font;
     for(const el of $("fontChips").querySelectorAll(".fontchip")) el.classList.toggle("on", el.dataset.v===D.font);
     selectFont(D.font, false);
@@ -6550,8 +6593,7 @@ function init(){
   });
 
   // ---------- 저장된 설정 복원 (있으면) ----------
-  (function restoreLook(){
-    const L = store.get("lumatone.look");
+  function applyLookData(L){
     if(!L) return;
     try{
       if(L.genre && GENRE_CHAINS[L.genre]){
@@ -6623,7 +6665,12 @@ function init(){
         for(const el of $("swatches").querySelectorAll(".sw"))
           el.classList.toggle("on", el.dataset.v===L.accent);
       }
-      if(L.beatFx){ S.beatFx = L.beatFx; syncChip("beatFxChips", L.beatFx); }
+      if(L.fxSel && Array.isArray(L.fxSel)){
+        S.fxSel = L.fxSel.slice();
+      }else if(L.beatFx){   // 구버전 호환
+        S.fxSel = L.beatFx==="mix" ? [...ALL_FX] : L.beatFx==="none" ? [] : [L.beatFx];
+      }
+      refreshFxSel();
       for(const k of ["kb","pump","moodShift","fade","fxOverlay","dust","cine","glowBoost","artFlow","beatCut","spot","vign","hueCycle","film"]){
         if(typeof L[k] === "boolean"){
           S[k] = L[k];
@@ -6653,6 +6700,10 @@ function init(){
       }
       if(L.artist) $("artistInput").value = L.artist;
       if(L.wm) $("wmInput").value = L.wm;
+      if(L.subs && Array.isArray(L.subs) && L.subs.length){
+        S.subs = L.subs.slice();
+        $("subManual").value = S.subs.map(s=>`[${fmtTC(s.start)}~${fmtTC(s.end)}] ${s.text}`).join("\n");
+      }
       if(L.quality === 720 || L.quality === 1080){
         S.quality = L.quality;
         $("qBtn").textContent = "화질 " + L.quality + "p";
@@ -6664,7 +6715,41 @@ function init(){
       }
     }catch(err){ console.warn("[LUMATONE] 설정 복원 일부 실패:", err); }
     updateDashboard();   // 복원된 설정을 요약에 반영
-  })();
+  }
+  applyLookData(store.get("lumatone.look"));   // 시작 시 이전 설정 복원
+
+  // ---------- 프로젝트 저장 / 불러오기 (설정만, 음원 제외) ----------
+  $("btnProjSave").addEventListener("click", ()=>{
+    saveLook();   // 현재 상태를 look 객체로 저장
+    const L = store.get("lumatone.look") || {};
+    L.title = $("titleInput") ? $("titleInput").value : "";
+    const proj = {app:"LUMATONE", version:"4.4", saved:new Date().toISOString(), look:L};
+    const blob = new Blob([JSON.stringify(proj,null,2)], {type:"application/json"});
+    const name = (L.title || "lumatone_project").replace(/[^\w가-힣\-]/g,"_") + ".lumatone";
+    deliverFile(blob, name);
+    toast("✓ 프로젝트 저장 — 파일 앱이나 공유로 보관하세요", 3500);
+  });
+  $("btnProjLoad").addEventListener("click", ()=> $("projInput").click());
+  $("projInput").addEventListener("change", e=>{
+    const f = e.target.files[0]; if(!f) return;
+    const rd = new FileReader();
+    rd.onload = ()=>{
+      try{
+        const proj = JSON.parse(rd.result);
+        const L = proj.look || proj;   // 파일 형식 유연 처리
+        if(!L || typeof L !== "object") throw new Error("형식 오류");
+        applyLookData(L);
+        if(L.title && $("titleInput")) $("titleInput").value = L.title;
+        drawFrame(null);
+        toast("✓ 프로젝트 불러옴 — 같은 음원을 다시 선택해 마무리하세요", 4000);
+      }catch(err){
+        console.error("[LUMATONE] 프로젝트 로드 실패:", err);
+        toast("불러오기 실패: 올바른 프로젝트 파일이 아닙니다", 4000);
+      }
+    };
+    rd.readAsText(f);
+    e.target.value = "";   // 같은 파일 재선택 허용
+  });
 
   // 이전 세션이 렌더 중 비정상 종료(메모리 크래시)됐는지 감지
   (function crashCheck(){
