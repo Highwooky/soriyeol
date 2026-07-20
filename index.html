@@ -657,20 +657,20 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <div class="row">
     <button class="btn small" id="btnProjSave">프로젝트 저장</button>
     <button class="btn small" id="btnProjLoad">불러오기</button>
-    <input type="file" id="projInput" accept=".lumatone,.json,application/json" hidden>
+    <input type="file" id="projInput" hidden>
   </div>
-  <p style="font-size:.7rem;color:var(--sub);line-height:1.5;margin:6px 0 0">비주얼·이펙트·마스터링·자막 등 모든 설정을 파일로 저장합니다. 음원은 용량 때문에 포함되지 않으니, 불러온 뒤 같은 음원을 다시 선택하세요.</p>
+  <p style="font-size:.7rem;color:var(--sub);line-height:1.5;margin:6px 0 0">비주얼·이펙트·마스터링·자막 등 모든 설정을 <b>.json 파일</b>로 저장합니다. 저장 시 파일 앱의 "다운로드"에 들어가며, 불러오기로 그 파일을 선택하면 복원됩니다. 음원은 용량 때문에 포함되지 않으니 같은 음원을 다시 선택하세요.</p>
 </section>
 
-<footer>LUMATONE v4.5 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v4.7 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
 <div id="editWrap">
   <div class="edbar" id="edSlides"></div>
   <canvas id="editCanvas" width="960" height="540"></canvas>
-  <p class="edhint">한 손가락: 이동 · 두 손가락: 확대/축소 · 프레임이 곧 최종 배경입니다</p>
-  <input type="range" id="edZoom" min="1" max="4" step="0.01" value="1">
+  <p class="edhint">한 손가락: 이동 · 두 손가락: 확대/축소 · 슬라이더를 왼쪽 끝까지 내리면 이미지 전체가 작게 들어갑니다</p>
+  <input type="range" id="edZoom" min="0.3" max="4" step="0.01" value="1">
   <div class="edbar">
     <button class="btn small" id="edRot">↻ 회전</button>
     <button class="btn small" id="edFlip">⇋ 반전</button>
@@ -3618,15 +3618,22 @@ function edImgWH(){
   const iw = ED.img.width, ih = ED.img.height;
   return ED.rot % 2 ? [ih, iw] : [iw, ih];   // 90°/270° 회전 시 가로세로 교환
 }
-function edMinScale(){
+function edCoverScale(){
   const [W,H] = edDims(), [w,h] = edImgWH();
-  return Math.max(W/w, H/h);                 // 프레임을 항상 가득 덮는 최소 배율
+  return Math.max(W/w, H/h);                 // 프레임을 가득 덮는 배율
+}
+function edMinScale(){
+  // 축소 허용: 커버 배율의 30%까지 (큰 이미지를 작게 줄여 여백 두기 가능)
+  return edCoverScale() * 0.3;
 }
 function edClamp(){
+  ED.cover = edCoverScale();
   ED.min = edMinScale();
   if(ED.scale < ED.min) ED.scale = ED.min;
   const [W,H] = edDims(), [w,h] = edImgWH();
-  const mx = (w*ED.scale - W)/2, my = (h*ED.scale - H)/2;
+  // 커버 배율 이상이면 프레임 안에서 이동 가능, 미만이면 중앙 고정
+  const sw = w*ED.scale, sh = h*ED.scale;
+  const mx = Math.max(0, (sw - W)/2), my = Math.max(0, (sh - H)/2);
   ED.ox = Math.min(mx, Math.max(-mx, ED.ox));
   ED.oy = Math.min(my, Math.max(-my, ED.oy));
 }
@@ -3648,11 +3655,11 @@ function edDraw(){
     x.beginPath(); x.moveTo(0, H*i/3); x.lineTo(W, H*i/3); x.stroke();
   }
 }
-function edSyncZoom(){ $("edZoom").value = (ED.scale/ED.min).toFixed(2); }
+function edSyncZoom(){ $("edZoom").value = (ED.scale/ED.cover).toFixed(2); }
 function edLoadSlide(idx){
   ED.idx = idx; ED.img = S.slides[idx];
   ED.rot = 0; ED.flip = false; ED.ox = 0; ED.oy = 0;
-  ED.scale = ED.min = edMinScale();
+  ED.scale = ED.cover = edCoverScale(); ED.min = edMinScale();
   edSyncZoom();
   for(const b of $("edSlides").querySelectorAll(".chip"))
     b.classList.toggle("on", parseInt(b.dataset.v,10)===idx);
@@ -5891,7 +5898,7 @@ function init(){
   $("btnDesc").addEventListener("click", copyDescription);
   $("btnDiag").addEventListener("click", async ()=>{
     const info = {
-      app: "LUMATONE v4.5",
+      app: "LUMATONE v4.7",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
@@ -6108,7 +6115,7 @@ function init(){
   $("edRot").addEventListener("click", ()=>{
     ED.rot = (ED.rot+1)%4;
     ED.ox = 0; ED.oy = 0;
-    ED.scale = edMinScale();
+    ED.scale = edCoverScale();   // 회전 후 프레임을 다시 가득 덮게
     edClamp(); edSyncZoom(); edDraw();
   });
   $("edFlip").addEventListener("click", ()=>{ ED.flip = !ED.flip; edDraw(); });
@@ -6116,11 +6123,11 @@ function init(){
   $("edCancel").addEventListener("click", closeEditor);
   $("edApply").addEventListener("click", edApplyCrop);
   $("edZoom").addEventListener("input", e=>{
-    const target = ED.min * parseFloat(e.target.value);
+    const target = ED.cover * parseFloat(e.target.value);   // 커버 기준 배율 (1.0=꽉참, <1=축소)
     const k = target / ED.scale;
     ED.scale = target;
     ED.ox *= k; ED.oy *= k;   // 중앙 기준 줌
-    edClamp(); edDraw();
+    edClamp(); edSyncZoom(); edDraw();
   });
   const edC = $("editCanvas");
   edC.addEventListener("pointerdown", e=>{
@@ -6751,33 +6758,51 @@ function init(){
 
   // ---------- 프로젝트 저장 / 불러오기 (설정만, 음원 제외) ----------
   $("btnProjSave").addEventListener("click", ()=>{
-    saveLook();   // 현재 상태를 look 객체로 저장
-    const L = store.get("lumatone.look") || {};
-    L.title = $("titleInput") ? $("titleInput").value : "";
-    const proj = {app:"LUMATONE", version:"4.4", saved:new Date().toISOString(), look:L};
-    const blob = new Blob([JSON.stringify(proj,null,2)], {type:"application/json"});
-    const name = (L.title || "lumatone_project").replace(/[^\w가-힣\-]/g,"_") + ".lumatone";
-    deliverFile(blob, name);
-    toast("✓ 프로젝트 저장 — 파일 앱이나 공유로 보관하세요", 3500);
+    try{
+      saveLook();   // 현재 상태를 look 객체로 저장
+      const L = store.get("lumatone.look") || {};
+      L.title = $("titleInput") ? $("titleInput").value : "";
+      const proj = {app:"LUMATONE", version:"4.6", saved:new Date().toISOString(), look:L};
+      const json = JSON.stringify(proj,null,2);
+      const base = (L.title || "lumatone_project").replace(/[^\w가-힣\-]/g,"_");
+      // iOS가 인식하는 .json 확장자로 직접 다운로드 링크 생성 (공유 시트보다 왕복이 확실)
+      const blob = new Blob([json], {type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = base + ".json";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 4000);
+      toast("✓ 프로젝트 저장됨 — 파일 앱에 보관 후 '불러오기'로 여세요", 4000);
+    }catch(err){
+      console.error("[LUMATONE] 프로젝트 저장 실패:", err);
+      toast("저장 실패: " + err.message, 4000);
+    }
   });
   $("btnProjLoad").addEventListener("click", ()=> $("projInput").click());
   $("projInput").addEventListener("change", e=>{
-    const f = e.target.files[0]; if(!f) return;
+    const f = e.target.files && e.target.files[0];
+    if(!f){ toast("파일을 선택하지 못했습니다"); return; }
     const rd = new FileReader();
     rd.onload = ()=>{
       try{
-        const proj = JSON.parse(rd.result);
-        const L = proj.look || proj;   // 파일 형식 유연 처리
-        if(!L || typeof L !== "object") throw new Error("형식 오류");
+        let text = String(rd.result || "").trim();
+        if(!text) throw new Error("빈 파일");
+        const proj = JSON.parse(text);
+        const L = (proj && proj.look) ? proj.look : proj;   // 형식 유연 처리
+        if(!L || typeof L !== "object" || Array.isArray(L)) throw new Error("형식 오류");
+        // 최소한 하나라도 LUMATONE 설정 키가 있어야 유효
+        const known = ["viz","genre","platform","fxSel","beatFx","subTheme","ratio"];
+        if(!known.some(k=>k in L)) throw new Error("LUMATONE 프로젝트가 아님");
         applyLookData(L);
         if(L.title && $("titleInput")) $("titleInput").value = L.title;
         drawFrame(null);
         toast("✓ 프로젝트 불러옴 — 같은 음원을 다시 선택해 마무리하세요", 4000);
       }catch(err){
         console.error("[LUMATONE] 프로젝트 로드 실패:", err);
-        toast("불러오기 실패: 올바른 프로젝트 파일이 아닙니다", 4000);
+        toast("불러오기 실패: " + (err.message==="형식 오류"||err.message==="LUMATONE 프로젝트가 아님" ? "올바른 프로젝트 파일이 아닙니다" : err.message), 4500);
       }
     };
+    rd.onerror = ()=>{ toast("파일을 읽지 못했습니다 — 다시 시도해주세요", 4000); };
     rd.readAsText(f);
     e.target.value = "";   // 같은 파일 재선택 허용
   });
