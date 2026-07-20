@@ -480,6 +480,8 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   </div>
   <div class="label">이펙트 강도: <b id="fxIntLabel" style="color:var(--text)">강 (140%)</b></div>
   <input type="range" id="fxIntRange" min="0.5" max="3" step="0.1" value="1.4">
+  <div class="label">비트 반응 감도: <b id="beatSensLabel" style="color:var(--text)">높음 (160%)</b> <span style="font-weight:400;color:var(--sub)">— 높을수록 촘촘하게</span></div>
+  <input type="range" id="beatSensRange" min="0.5" max="3" step="0.1" value="1.6">
   <div class="chips" style="margin-top:8px">
     <button class="chip" id="chipBeatCut">비트 컷 전환 (플리)</button>
   </div>
@@ -586,7 +588,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p class="notice" id="renderNote">렌더 중 다른 앱으로 이동하거나 화면을 잠그면 작업이 멈춥니다.</p>
 </section>
 
-<footer>LUMATONE v3.7 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v3.8 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -2573,6 +2575,7 @@ const S = {
   fxKick: 0, fxCur: "zoom", glitchN: 0,
   fxIntensity: 1.4,        // 비트 이펙트 강도 배율 (0.5~3.0) — 기본 강하게
   pumpAmt: 1.4,            // 배경 펌핑 강도 배율
+  beatSens: 1.6,           // 비트 감지 감도 (0.5~3.0) — 높을수록 촘촘하게 반응
   cutIdx: 0, lastCutT: 0,
   vizPeaks: null,          // 피크 바용 피크 홀드
   particles: [],
@@ -2618,7 +2621,7 @@ function saveLook(){
     fastRender:S.fastRender,
     subOn:S.subOn, subMode:S.subMode, subPos:S.subPos, subStyle:S.subStyle, subScale:S.subScale, subs:S.subs,
     subFont:S.subFont, subY:S.subY, subTheme:S.subTheme, titleTheme:S.titleTheme,
-    fxIntensity:S.fxIntensity, pumpAmt:S.pumpAmt,
+    fxIntensity:S.fxIntensity, pumpAmt:S.pumpAmt, beatSens:S.beatSens,
     dust:S.dust, cine:S.cine, glowBoost:S.glowBoost, artFlow:S.artFlow,
     vizPos:S.vizPos, vizScale:S.vizScale, textPos:S.textPos, textScale:S.textScale,
     artist: $("artistInput") ? $("artistInput").value : "",
@@ -3706,10 +3709,16 @@ function bandLevels(freq, n){
 // ---------- 비트 감지 & 파티클 ----------
 function updateBeat(bass, dt, tSec){
   // 저역 에너지 이동평균 대비 급상승 = 비트 (감쇠형 펄스 생성)
-  S.bassAvg += (bass - S.bassAvg) * Math.min(1, dt*1.2);
+  // beatSens(감도)가 높을수록: 임계값↓, 쿨다운↓, 최소 저역↓ → 더 촘촘하게 반응
+  const sens = S.beatSens || 1.0;
+  S.bassAvg += (bass - S.bassAvg) * Math.min(1, dt*(1.2 + sens*0.4));   // 감도↑ = 이동평균 빠르게 추종
   S.beatCool = Math.max(0, S.beatCool - dt);
-  if(bass > S.bassAvg*1.28 + 0.025 && S.beatCool<=0 && bass>0.07){
-    S.beatPulse = 1; S.beatCool = 0.16;
+  const thresh = 1.0 + 0.35/sens;        // 감도 1.6 → 1.22배, 감도 3.0 → 1.12배
+  const floorAdd = 0.03/sens;            // 감도↑ = 더 작은 상승도 감지
+  const minBass = Math.max(0.02, 0.08/sens);
+  const cooldown = Math.max(0.05, 0.18/sens);   // 감도↑ = 연속 발동 허용
+  if(bass > S.bassAvg*thresh + floorAdd && S.beatCool<=0 && bass>minBass){
+    S.beatPulse = 1; S.beatCool = cooldown;
     if(S.viz==="burst") spawnBurst(Math.min(1, bass));
     // 비트 이펙트 발동 (믹스는 시드 난수로 결정론적 선택 → 고속 렌더에서도 동일)
     if(S.beatFx !== "none"){
@@ -5446,7 +5455,7 @@ function init(){
   $("btnDesc").addEventListener("click", copyDescription);
   $("btnDiag").addEventListener("click", async ()=>{
     const info = {
-      app: "LUMATONE v3.7",
+      app: "LUMATONE v3.8",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
@@ -5835,6 +5844,11 @@ function init(){
     $("pumpLabel").textContent = `${fxLabel(S.pumpAmt)} (${Math.round(S.pumpAmt*100)}%)`;
     if(!S.playing && !S.rendering) drawFrame(null);
   });
+  const sensLabelTxt = v => v>=2.2 ? "최고" : v>=1.4 ? "높음" : v>=0.9 ? "보통" : "낮음";
+  $("beatSensRange").addEventListener("input", e=>{
+    S.beatSens = parseFloat(e.target.value);
+    $("beatSensLabel").textContent = `${sensLabelTxt(S.beatSens)} (${Math.round(S.beatSens*100)}%)`;
+  });
   bindChips("toneChips", v=>{ S.tone=v; if(!S.playing && !S.rendering) drawFrame(null); });
   $("wmInput").addEventListener("input", ()=>{ if(!S.playing && !S.rendering) drawFrame(null); });
 
@@ -6046,6 +6060,11 @@ function init(){
         S.pumpAmt = L.pumpAmt;
         $("pumpRange").value = L.pumpAmt;
         $("pumpLabel").textContent = `${L.pumpAmt>=2?"최강":L.pumpAmt>=1.3?"강":L.pumpAmt>=0.9?"보통":"약"} (${Math.round(L.pumpAmt*100)}%)`;
+      }
+      if(typeof L.beatSens === "number"){
+        S.beatSens = L.beatSens;
+        $("beatSensRange").value = L.beatSens;
+        $("beatSensLabel").textContent = `${L.beatSens>=2.2?"최고":L.beatSens>=1.4?"높음":L.beatSens>=0.9?"보통":"낮음"} (${Math.round(L.beatSens*100)}%)`;
       }
       if(L.subStyle){ S.subStyle = L.subStyle; syncChip("subStyleChips", L.subStyle); }
       if(L.subTheme){ S.subTheme = L.subTheme; syncChip("subThemeChips", L.subTheme); }
