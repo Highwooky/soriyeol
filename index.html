@@ -662,7 +662,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p style="font-size:.7rem;color:var(--sub);line-height:1.5;margin:6px 0 0">비주얼·이펙트·마스터링·자막 등 모든 설정을 파일로 저장합니다. 음원은 용량 때문에 포함되지 않으니, 불러온 뒤 같은 음원을 다시 선택하세요.</p>
 </section>
 
-<footer>LUMATONE v4.4 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v4.5 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -5367,7 +5367,7 @@ async function fastRender(){
   S.fastActive = true;
   document.body.classList.add("renderlock");
   S.renderStop = null;   // 고속 모드는 S.rendering 플래그로 취소
-  store.set("lumatone.rflag", {t:Date.now(), q:S.quality});   // 메모리 크래시 감지용
+  store.set("lumatone.rflag", {t:Date.now(), q:S.quality, dur:S.totalDur});   // 메모리 크래시 감지용
   const VBR = S.quality===1080 ? 10_000_000 : 6_000_000;
   $("pTotal").textContent = fmtTime(dur);
   $("progressWrap").style.display = "block";
@@ -5579,6 +5579,33 @@ function pickMime(){
 async function startRender(){
   if(!S.tracks.length){ toast("먼저 음원을 불러오세요"); return; }
   if(!S.tracks.every(t=>t.proc)){ toast("먼저 '사운드 적용'을 눌러주세요"); return; }
+
+  // ── 긴 곡 메모리 안전 체크 (실시간 렌더는 전체를 메모리에 쌓음) ──
+  recalcOffsets();
+  const durMin = S.totalDur / 60;
+  if(!S.fastRender && durMin > 6){
+    // 예상 메모리 ≈ 비트레이트 × 시간 (video+audio)
+    const mbps = (S.quality===1080 ? 10 : 6) + 0.13;   // Mbit/s
+    const estMB = Math.round(mbps * S.totalDur / 8);
+    let msg;
+    if(durMin > 12){
+      msg = `⚠️ ${durMin.toFixed(0)}분 영상은 실시간 렌더 중 아이폰 메모리 한계로 중간에 멈출 위험이 매우 높습니다 (예상 ${estMB}MB).\n\n` +
+        `강력 권장:\n` +
+        `• 화질을 720p로 낮추기 (메모리 40%↓)\n` +
+        `• 플리를 2~3곡씩 나눠서 따로 렌더\n\n` +
+        `720p로 낮추고 계속할까요? (취소 시 현재 설정 유지)`;
+    }else{
+      msg = `${durMin.toFixed(0)}분 영상입니다 (예상 ${estMB}MB). 길어질수록 메모리 부담이 커집니다.\n\n720p로 낮춰 안정적으로 진행할까요? (취소 시 현재 설정 유지)`;
+    }
+    const goDown = confirm(msg);
+    if(goDown && S.quality !== 720){
+      S.quality = 720;
+      $("qBtn").textContent = "화질 720p";
+      updateDashboard();
+      toast("화질을 720p로 낮췄습니다 — 더 안정적입니다", 2500);
+    }
+  }
+
   // 고속 경로: WebCodecs 지원 + 전 트랙 샘플레이트 일치 시
   if(S.fastRender && await checkFastSupport()){
     const sr0 = S.tracks[0].proc.sampleRate;
@@ -5615,8 +5642,12 @@ async function startRender(){
 
   const vStream = rc.captureStream(30);
   const stream = new MediaStream([...vStream.getVideoTracks(), ...recDest.stream.getAudioTracks()]);
+  // 긴 곡일수록 비트레이트를 낮춰 메모리 누적을 완화 (화질 손실 최소)
+  const longFactor = S.totalDur > 720 ? 0.6 : S.totalDur > 360 ? 0.75 : 1.0;
+  const baseBitrate = S.quality===1080 ? 10_000_000 : 6_000_000;
+  const vbr = Math.round(baseBitrate * longFactor);
   const recorder = new MediaRecorder(stream,
-    {mimeType:mime, videoBitsPerSecond: S.quality===1080 ? 10_000_000 : 6_000_000});
+    {mimeType:mime, videoBitsPerSecond: vbr});
   S.recChunks = [];
   recorder.ondataavailable = e => { if(e.data && e.data.size) S.recChunks.push(e.data); };
   recorder.onstop = () => finishRender(mime);
@@ -5635,9 +5666,9 @@ async function startRender(){
   $("btnPreview").disabled = true;
   S.rendering = true;
   document.body.classList.add("renderlock");
-  store.set("lumatone.rflag", {t:Date.now(), q:S.quality});   // 메모리 크래시 감지용
+  store.set("lumatone.rflag", {t:Date.now(), q:S.quality, dur:S.totalDur});   // 메모리 크래시 감지용
 
-  recorder.start(1000);
+  recorder.start(5000);   // 5초 청크 — Blob 개수를 줄여 메모리 부담 완화
   if(S.bgMode==="video" && S.bgVideo){ S.bgVideo.currentTime = 0; S.bgVideo.play().catch(()=>{}); }
   const t0 = ctx.currentTime + 0.05;
   scheduleFade(fade, ctx, t0, dur);
@@ -5860,7 +5891,7 @@ function init(){
   $("btnDesc").addEventListener("click", copyDescription);
   $("btnDiag").addEventListener("click", async ()=>{
     const info = {
-      app: "LUMATONE v4.4",
+      app: "LUMATONE v4.5",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
@@ -6760,7 +6791,13 @@ function init(){
       S.quality = 720;
       $("qBtn").textContent = "화질 720p";
     }
-    toast("⚠ 이전 렌더 중 메모리 부족으로 재시작된 것 같습니다 — 안정성을 위해 화질을 720p로 낮췄습니다 (긴 곡/플리 권장)", 6500);
+    // 긴 곡이었으면 분할 렌더를 권장
+    const wasLong = rf.dur && rf.dur > 600;
+    const msg = wasLong
+      ? "⚠ 이전 렌더가 메모리 부족으로 중단된 것 같습니다. 화질을 720p로 낮췄습니다. 20분 같은 긴 플리는 2~3곡씩 나눠 렌더하면 훨씬 안정적입니다."
+      : "⚠ 이전 렌더 중 메모리 부족으로 재시작된 것 같습니다 — 안정성을 위해 화질을 720p로 낮췄습니다.";
+    toast(msg, 7000);
+    updateDashboard();
   })();
 
   refreshArt(false);
