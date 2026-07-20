@@ -137,6 +137,9 @@ input[type=text]:focus{border-color:var(--accent)}
 #prevDockBar .dtitle{font-size:.76rem;font-weight:700;color:var(--sub);flex:1}
 #prevDockBar button{background:var(--surface2);border:1px solid var(--line);color:var(--text);
   border-radius:8px;padding:5px 12px;font-size:.74rem;font-weight:600;cursor:pointer}
+#prevDockPlay{background:var(--accent) !important;color:#0A0C10 !important;border-color:var(--accent) !important}
+#prevDockPlay.playing{background:var(--surface2) !important;color:var(--text) !important;border-color:var(--line) !important}
+#autoExpandChip.on{background:var(--accent) !important;color:#0A0C10 !important;border-color:var(--accent) !important}
 #prevDock.collapsed #prevDockToggle{color:var(--accent)}
 
 .progresswrap{display:none;margin-top:14px}
@@ -183,6 +186,8 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
 <div id="prevDock">
   <div id="prevDockBar">
     <span class="dtitle">미리보기</span>
+    <button id="autoExpandChip" title="스크롤 자동 펼침">⇕ 자동</button>
+    <button id="prevDockPlay">▶ 미리듣기</button>
     <button id="prevDockToggle">접기 ▲</button>
   </div>
   <div class="previewbox"><canvas id="previewCanvas" width="960" height="540"></canvas></div>
@@ -483,6 +488,15 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
     <button class="chip" data-v="zoomblur">줌 블러</button>
     <button class="chip" data-v="strobe">스트로브</button>
     <button class="chip" data-v="spin">스핀 셰이크</button>
+    <button class="chip" data-v="vhs">VHS 왜곡</button>
+    <button class="chip" data-v="chroma">색수차 줌</button>
+    <button class="chip" data-v="mirror">미러 플래시</button>
+    <button class="chip" data-v="kaleido">만화경</button>
+    <button class="chip" data-v="stretch">방사 스트레치</button>
+    <button class="chip" data-v="prism">프리즘</button>
+    <button class="chip" data-v="invert">인버트 플래시</button>
+    <button class="chip" data-v="hearts">하트 파티클</button>
+    <button class="chip" data-v="sparkle">스파클</button>
     <button class="chip hot" data-v="mix">믹스 ✦</button>
   </div>
   <div class="label">이펙트 강도: <b id="fxIntLabel" style="color:var(--text)">강 (140%)</b></div>
@@ -617,7 +631,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p class="notice" id="renderNote">렌더 중 다른 앱으로 이동하거나 화면을 잠그면 작업이 멈춥니다.</p>
 </section>
 
-<footer>LUMATONE v4.0 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v4.1 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -3800,7 +3814,7 @@ function updateBeat(bass, dt, tSec){
       if(S.viz==="burst") spawnBurst(0.7);
       if(S.beatFx !== "none"){
         S.fxKick = 1;
-        const opts = ["zoom","flash","shake","glitch","ghost","rgbsplit","zoomblur","strobe","spin"];
+        const opts = ["zoom","flash","shake","glitch","ghost","rgbsplit","zoomblur","strobe","spin","vhs","chroma","mirror","kaleido","stretch","prism","invert","hearts","sparkle"];
         S.fxCur = S.beatFx==="mix"
           ? opts[phase % opts.length]   // 박자 순서대로 순환 (결정론적)
           : S.beatFx;
@@ -3831,7 +3845,7 @@ function updateBeat(bass, dt, tSec){
     // 비트 이펙트 발동 (믹스는 시드 난수로 결정론적 선택 → 고속 렌더에서도 동일)
     if(S.beatFx !== "none"){
       S.fxKick = 1;
-      const opts = ["zoom","flash","shake","glitch","ghost","rgbsplit","zoomblur","strobe","spin"];
+      const opts = ["zoom","flash","shake","glitch","ghost","rgbsplit","zoomblur","strobe","spin","vhs","chroma","mirror","kaleido","stretch","prism","invert","hearts","sparkle"];
       S.fxCur = S.beatFx==="mix"
         ? opts[Math.floor(mulberry32(1+Math.floor(tSec*997))()*opts.length)]
         : S.beatFx;
@@ -4806,6 +4820,100 @@ function drawFrame(audio, progress, tOverride){
           x.fillRect(0,0,w,h);
           x.globalAlpha = 1;
         }
+      }else if(S.fxCur==="vhs"){
+        // VHS 왜곡 — 수평 지터 슬라이스 + 색번짐 + 스캔라인
+        const rnd = mulberry32(700+Math.floor(tSec*24));
+        const rows = 14;
+        for(let r=0;r<rows;r++){
+          const sy = h*r/rows, sh = h/rows;
+          const jx = (rnd()*2-1)*w*0.03*k*FI;
+          x.drawImage(c, 0, sy, w, sh, jx, sy, w, sh);
+        }
+        x.globalCompositeOperation = "screen";
+        x.globalAlpha = 0.3*k*FI;
+        x.drawImage(c, w*0.01*k*FI, 0);   // 색번짐
+        x.globalCompositeOperation = "source-over";
+        x.globalAlpha = 0.06*k;
+        x.fillStyle = "#000";
+        for(let sy2=0; sy2<h; sy2+=3){ x.fillRect(0,sy2,w,1); }   // 스캔라인
+        x.globalAlpha = 1;
+      }else if(S.fxCur==="chroma"){
+        // 색수차 줌 — 확대하며 RGB가 방사형으로 벌어짐
+        const z = 1 + 0.06*k*FI;
+        x.globalCompositeOperation = "screen";
+        x.globalAlpha = 0.5;
+        const dw2=w*z, dh2=h*z, off=w*0.012*k*FI;
+        x.drawImage(c, (w-dw2)/2-off, (h-dh2)/2, dw2, dh2);   // R 시프트
+        x.drawImage(c, (w-dw2)/2+off, (h-dh2)/2, dw2, dh2);   // B 시프트
+        x.globalAlpha = 1;
+        x.globalCompositeOperation = "source-over";
+        x.fillStyle = "#FF0033"; x.globalCompositeOperation="screen"; x.globalAlpha=0.18*k*FI;
+        x.fillRect(-off,0,w,h);
+        x.fillStyle = "#0066FF"; x.fillRect(off,0,w,h);
+        x.globalAlpha=1; x.globalCompositeOperation="source-over";
+      }else if(S.fxCur==="mirror"){
+        // 미러 플래시 — 좌우 대칭 반사 (비트마다 순간 거울)
+        x.globalAlpha = Math.min(0.85, k*FI);
+        x.save();
+        x.translate(w,0); x.scale(-1,1);
+        x.drawImage(c, 0, 0, w/2, h, 0, 0, w/2, h);   // 왼쪽 절반을 오른쪽에 반사
+        x.restore();
+        x.globalAlpha = 1;
+      }else if(S.fxCur==="kaleido"){
+        // 카레이도스코프 — 4분할 대칭 만화경
+        x.globalAlpha = Math.min(0.9, k*FI);
+        const hw=w/2, hh=h/2;
+        // 좌상단을 나머지 3사분면에 반사
+        x.save(); x.translate(w,0); x.scale(-1,1); x.drawImage(c,0,0,hw,hh,0,0,hw,hh); x.restore();
+        x.save(); x.translate(0,h); x.scale(1,-1); x.drawImage(c,0,0,hw,hh,0,0,hw,hh); x.restore();
+        x.save(); x.translate(w,h); x.scale(-1,-1); x.drawImage(c,0,0,hw,hh,0,0,hw,hh); x.restore();
+        x.globalAlpha = 1;
+      }else if(S.fxCur==="stretch"){
+        // 방사 스트레치 — 중심에서 잡아당기는 왜곡 (링 형태 확대 합성)
+        x.globalCompositeOperation = "lighter";
+        for(let s=1;s<=3;s++){
+          const sc = 1 + s*0.05*k*FI;
+          x.globalAlpha = 0.4*k/s;
+          x.drawImage(c, w*(1-sc)/2, 0, w*sc, h);   // 가로만 스트레치
+        }
+        x.globalAlpha = 1; x.globalCompositeOperation = "source-over";
+      }else if(S.fxCur==="prism"){
+        // 프리즘 — 무지개 색 3중 오프셋 번짐
+        x.globalCompositeOperation = "screen";
+        const off = w*0.015*k*FI;
+        const cols = ["#FF0000","#00FF00","#0000FF"];
+        for(let i=0;i<3;i++){
+          x.globalAlpha = 0.35*k*FI;
+          const a = (i/3)*Math.PI*2 + tSec;
+          x.drawImage(c, Math.cos(a)*off, Math.sin(a)*off);
+          x.fillStyle = cols[i]; x.globalAlpha = 0.1*k*FI;
+          x.fillRect(Math.cos(a)*off, Math.sin(a)*off, w, h);
+        }
+        x.globalAlpha = 1; x.globalCompositeOperation = "source-over";
+      }else if(S.fxCur==="invert"){
+        // 인버트 플래시 — 순간 색반전 (강렬한 임팩트)
+        if(k > 0.5){
+          x.globalCompositeOperation = "difference";
+          x.globalAlpha = Math.min(1, (k-0.5)*2*FI);
+          x.fillStyle = "#fff";
+          x.fillRect(0,0,w,h);
+          x.globalAlpha = 1;
+          x.globalCompositeOperation = "source-over";
+        }
+      }else if(S.fxCur==="hearts" || S.fxCur==="sparkle"){
+        // 하트/스파클 파티클 — 비트마다 튀어오르는 이모지 파티클
+        const rnd = mulberry32(900+Math.floor(tSec*8));
+        const emo = S.fxCur==="hearts" ? ["💖","💗","✨","💕"] : ["✨","⭐","💫","🌟"];
+        const n = Math.floor(6*k*FI);
+        x.textAlign = "center"; x.textBaseline = "middle";
+        for(let i=0;i<n;i++){
+          const px = rnd()*w, py = h*(0.3+rnd()*0.6);
+          const sz = mn*(0.03+rnd()*0.05)*(0.6+k);
+          x.globalAlpha = Math.min(1, k*1.2)*(0.5+rnd()*0.5);
+          x.font = `${sz}px serif`;
+          x.fillText(emo[Math.floor(rnd()*emo.length)], px, py);
+        }
+        x.globalAlpha = 1; x.textBaseline = "alphabetic";
       }
     }
     if(S.glitchN > 0){
@@ -4911,6 +5019,7 @@ function stopPreview(){
   S.playing = false;
   cancelAnimationFrame(previewRAF);
   $("btnPreview").textContent = "▶ 미리듣기";
+  const dp = $("prevDockPlay"); if(dp){ dp.textContent = "▶ 미리듣기"; dp.classList.remove("playing"); }
   drawFrame(null);
 }
 function startPreview(){
@@ -4926,6 +5035,7 @@ function startPreview(){
   const last = startAll(nodes, t0);
   last.onended = stopPreview;
   $("btnPreview").textContent = "■ 정지";
+  const dp = $("prevDockPlay"); if(dp){ dp.textContent = "■ 정지"; dp.classList.add("playing"); }
   const loop = ()=>{
     if(!S.playing) return;
     drawFrame(nodes, (getCtx().currentTime - t0)/dur);
@@ -5718,7 +5828,7 @@ function init(){
   $("btnDesc").addEventListener("click", copyDescription);
   $("btnDiag").addEventListener("click", async ()=>{
     const info = {
-      app: "LUMATONE v4.0",
+      app: "LUMATONE v4.1",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
@@ -6067,6 +6177,10 @@ function init(){
   });
   // ---------- 아코디언 섹션 접기/펴기 ----------
   const collapseState = store.get("lumatone.collapse") || {n1:false, n2:true, n3:true, n4:true};
+  let autoExpand = store.get("lumatone.autoExpand");
+  if(autoExpand === null || autoExpand === undefined) autoExpand = true;   // 기본 켜짐
+  let autoPausedUntil = 0;   // 수동 조작 후 잠시 자동 중단
+
   document.querySelectorAll(".step.collapsible").forEach(sec=>{
     const id = sec.dataset.sec;
     if(collapseState[id]) sec.classList.add("collapsed");
@@ -6074,7 +6188,48 @@ function init(){
       sec.classList.toggle("collapsed");
       collapseState[id] = sec.classList.contains("collapsed");
       store.set("lumatone.collapse", collapseState);
+      autoPausedUntil = Date.now() + 2500;   // 수동 조작 시 2.5초간 자동 억제
     });
+  });
+
+  // 자동 펼침: 뷰포트 상단(독 아래)에 걸친 섹션만 펼치고 나머지 접기
+  function autoExpandTick(){
+    if(!autoExpand || Date.now() < autoPausedUntil) return;
+    const secs = [...document.querySelectorAll(".step.collapsible")];
+    if(!secs.length) return;
+    const dockH = $("prevDock").offsetHeight || 0;
+    const anchor = dockH + 80;   // 독 아래 기준선
+    // 기준선을 지난(위로) 섹션 중 가장 아래(=현재 보는 것) 선택
+    let active = secs[0];
+    for(const sec of secs){
+      const top = sec.getBoundingClientRect().top;
+      if(top <= anchor) active = sec;
+    }
+    let changed = false;
+    for(const sec of secs){
+      const shouldCollapse = sec !== active;
+      if(sec.classList.contains("collapsed") !== shouldCollapse){
+        sec.classList.toggle("collapsed", shouldCollapse);
+        collapseState[sec.dataset.sec] = shouldCollapse;
+        changed = true;
+      }
+    }
+    if(changed) store.set("lumatone.collapse", collapseState);
+  }
+  let autoRAF = 0;
+  window.addEventListener("scroll", ()=>{
+    if(autoRAF) return;
+    autoRAF = requestAnimationFrame(()=>{ autoRAF=0; autoExpandTick(); });
+  }, {passive:true});
+
+  // 자동 펼침 토글 (미리보기 독 바에 추가)
+  $("autoExpandChip").classList.toggle("on", autoExpand);
+  $("autoExpandChip").addEventListener("click", ()=>{
+    autoExpand = !autoExpand;
+    $("autoExpandChip").classList.toggle("on", autoExpand);
+    store.set("lumatone.autoExpand", autoExpand);
+    if(autoExpand){ autoPausedUntil = 0; autoExpandTick(); }
+    toast(autoExpand ? "스크롤 자동 펼침 켜짐" : "자동 펼침 꺼짐 — 수동으로 접고 펴세요", 2500);
   });
 
   // ---------- 설정 요약 대시보드 ----------
@@ -6280,6 +6435,10 @@ function init(){
     updateDashboard();
   });
   $("btnPreview").addEventListener("click", ()=> S.playing ? stopPreview() : startPreview());
+  $("prevDockPlay").addEventListener("click", ()=>{
+    if(!S.tracks.length || !S.tracks[0].proc){ toast("먼저 '사운드 적용'을 해주세요"); return; }
+    S.playing ? stopPreview() : startPreview();
+  });
   $("btnRender").addEventListener("click", startRender);
   $("btnCancel").addEventListener("click", cancelRender);
   $("btnDim").addEventListener("click", ()=>{ if(S.rendering) $("dimWrap").classList.add("open"); });
