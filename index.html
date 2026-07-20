@@ -13,6 +13,7 @@
 :root{
   --bg:#0D1015; --surface:#151A21; --surface2:#1B222B; --line:#242E3A;
   --text:#E8ECF1; --sub:#8B95A3; --accent:#3ECFB2; --hot:#E8603C; --gold:#D9B36C;
+  --safe-top:env(safe-area-inset-top);
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{font-size:16px}
@@ -128,8 +129,11 @@ input[type=text]:focus{border-color:var(--accent)}
 #previewCanvas{display:block;width:100%}
 .prevctl{display:flex;gap:8px;margin-top:10px}
 /* 상단 고정 미리보기 독 */
-#prevDock{position:sticky;top:0;z-index:40;background:var(--bg);
+#prevDock{position:sticky;top:env(safe-area-inset-top);z-index:40;background:var(--bg);
   padding:8px 0 10px;margin:0 -2px 6px;border-bottom:1px solid var(--line)}
+/* 상태바·다이내믹 아일랜드 영역을 배경으로 덮어 겹침 방지 */
+#prevDock::before{content:"";position:absolute;left:0;right:0;bottom:100%;
+  height:env(safe-area-inset-top);background:var(--bg)}
 #prevDock .previewbox{margin-top:0;display:flex;justify-content:center;background:#000}
 #prevDock #previewCanvas{max-height:38vh;width:auto;max-width:100%;display:block}
 #prevDock.collapsed .previewbox{display:none}
@@ -631,7 +635,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p class="notice" id="renderNote">렌더 중 다른 앱으로 이동하거나 화면을 잠그면 작업이 멈춥니다.</p>
 </section>
 
-<footer>LUMATONE v4.1 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v4.2 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -5828,7 +5832,7 @@ function init(){
   $("btnDesc").addEventListener("click", copyDescription);
   $("btnDiag").addEventListener("click", async ()=>{
     const info = {
-      app: "LUMATONE v4.1",
+      app: "LUMATONE v4.2",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
@@ -6197,8 +6201,9 @@ function init(){
     if(!autoExpand || Date.now() < autoPausedUntil) return;
     const secs = [...document.querySelectorAll(".step.collapsible")];
     if(!secs.length) return;
-    const dockH = $("prevDock").offsetHeight || 0;
-    const anchor = dockH + 80;   // 독 아래 기준선
+    // 독이 sticky로 고정된 실제 화면상 하단 위치를 기준선으로 (안전영역 자동 반영)
+    const dockRect = $("prevDock").getBoundingClientRect();
+    const anchor = dockRect.bottom + 40;
     // 기준선을 지난(위로) 섹션 중 가장 아래(=현재 보는 것) 선택
     let active = secs[0];
     for(const sec of secs){
