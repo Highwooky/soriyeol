@@ -305,15 +305,30 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   </div>
 
   <div class="subpane on" data-p="visual">
-  <div class="label">추천 프리셋 — 원탭으로 조합 적용</div>
+  <div class="label">추천 프리셋 — 원탭으로 조합 적용 <span style="font-weight:400;color:var(--sub)">비주얼·이펙트·강도·색상 한번에</span></div>
+  <div style="font-size:.68rem;color:var(--sub);margin:2px 0 4px">잔잔·감성</div>
   <div class="chips" id="presetLook">
-    <button class="chip" data-v="cinematic">시네마틱 감성</button>
-    <button class="chip" data-v="neon">네온 EDM</button>
-    <button class="chip" data-v="retro">레트로 LP</button>
-    <button class="chip" data-v="minimal">미니멀</button>
-    <button class="chip" data-v="star">별빛 발라드</button>
-    <button class="chip" data-v="dancheong">단청 만다라</button>
-    <button class="chip" data-v="synthwave">신스웨이브</button>
+    <button class="chip" data-v="cinematic">🎬 시네마틱</button>
+    <button class="chip" data-v="ballad">💗 발라드</button>
+    <button class="chip" data-v="minimal">◽ 미니멀</button>
+    <button class="chip" data-v="lofi">📻 로파이</button>
+  </div>
+  <div style="font-size:.68rem;color:var(--sub);margin:8px 0 4px">다이내믹·클럽 (박자 자동)</div>
+  <div class="chips" id="presetLook2">
+    <button class="chip" data-v="edm">⚡ EDM</button>
+    <button class="chip" data-v="hiphop">🎤 힙합</button>
+    <button class="chip" data-v="synthwave">🌆 신스웨이브</button>
+    <button class="chip" data-v="club">🪩 클럽</button>
+  </div>
+  <div style="font-size:.68rem;color:var(--sub);margin:8px 0 4px">숏폼·화려함</div>
+  <div class="chips" id="presetLook3">
+    <button class="chip" data-v="tiktok">📱 틱톡</button>
+    <button class="chip" data-v="vaporwave">🌴 베이퍼웨이브</button>
+  </div>
+  <div style="font-size:.68rem;color:var(--sub);margin:8px 0 4px">한국 전통</div>
+  <div class="chips" id="presetLook4">
+    <button class="chip" data-v="dancheong">🏮 단청</button>
+    <button class="chip" data-v="jangdan">🥁 장단</button>
   </div>
   <div style="margin-top:10px"><button class="btn small" id="btnLookReset">↺ 화면 구성 전체 초기화</button></div>
   <div class="label">비율</div>
@@ -635,7 +650,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p class="notice" id="renderNote">렌더 중 다른 앱으로 이동하거나 화면을 잠그면 작업이 멈춥니다.</p>
 </section>
 
-<footer>LUMATONE v4.2 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v4.3 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -5832,7 +5847,7 @@ function init(){
   $("btnDesc").addEventListener("click", copyDescription);
   $("btnDiag").addEventListener("click", async ()=>{
     const info = {
-      app: "LUMATONE v4.2",
+      app: "LUMATONE v4.3",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
@@ -6301,20 +6316,54 @@ function init(){
 
   // ---------- 추천 프리셋 (원탭 룩) ----------
   const LOOKS = {
-    cinematic:{viz:"aurora", mood:"dawn",    accent:"#D9B36C", tone:"warm", beatFx:"none",
+    // ── 잔잔·감성 계열 ──────────────────────────────
+    cinematic:{viz:"aurora", mood:"dawn", accent:"#D9B36C", tone:"warm", beatFx:"none",
+      beatMode:"detect", fxInt:1.0, pump:1.0, titleTheme:"gold", subTheme:"gold",
       set:{kb:1,pump:0,moodShift:0,fade:1,fxOverlay:1,dust:1,cine:1,glowBoost:0,artFlow:0,beatCut:0,spot:1,vign:1,hueCycle:0,film:0}},
-    neon:     {viz:"tunnel", mood:"neon",    accent:"#3ECFB2", tone:"cool", beatFx:"mix",
-      set:{kb:0,pump:1,moodShift:1,fade:1,fxOverlay:0,dust:0,cine:0,glowBoost:1,artFlow:1,beatCut:0,spot:0,vign:1,hueCycle:0,film:0}},
-    retro:    {viz:"lp",     mood:"dusk",    accent:"#E8603C", tone:"warm", beatFx:"none",
-      set:{kb:1,pump:0,moodShift:0,fade:1,fxOverlay:1,dust:1,cine:0,glowBoost:0,artFlow:0,beatCut:0,spot:0,vign:1,hueCycle:0,film:1}},
-    minimal:  {viz:"ring",   mood:"celadon", accent:"#F2F2F2", tone:"none", beatFx:"none",
+    ballad:   {viz:"wavecircle", mood:"dawn", accent:"#B8F2E6", tone:"warm", beatFx:"none",
+      beatMode:"detect", fxInt:0.8, pump:0.8, titleTheme:"white", subTheme:"white",
+      set:{kb:1,pump:1,moodShift:0,fade:1,fxOverlay:1,dust:1,cine:1,glowBoost:1,artFlow:0,beatCut:0,spot:1,vign:1,hueCycle:0,film:0}},
+    minimal:  {viz:"ring", mood:"celadon", accent:"#F2F2F2", tone:"none", beatFx:"none",
+      beatMode:"detect", fxInt:0.8, pump:0.6, titleTheme:"white", subTheme:"white",
       set:{kb:1,pump:0,moodShift:0,fade:1,fxOverlay:0,dust:0,cine:0,glowBoost:0,artFlow:0,beatCut:0,spot:0,vign:0,hueCycle:0,film:0}},
-    star:     {viz:"dots",   mood:"dawn",    accent:"#5B8CFF", tone:"cool", beatFx:"none",
-      set:{kb:1,pump:0,moodShift:0,fade:1,fxOverlay:0,dust:1,cine:0,glowBoost:1,artFlow:0,beatCut:0,spot:0,vign:1,hueCycle:0,film:0}},
-    dancheong:{viz:"mandala",mood:"dusk",    accent:"#D9B36C", tone:"warm", beatFx:"none",
-      set:{kb:1,pump:1,moodShift:0,fade:1,fxOverlay:0,dust:1,cine:0,glowBoost:1,artFlow:1,beatCut:0,spot:0,vign:1,hueCycle:1,film:0}},
-    synthwave:{viz:"ridge",  mood:"neon",    accent:"#5B8CFF", tone:"cool", beatFx:"zoom",
+    lofi:     {viz:"lp", mood:"dusk", accent:"#E8603C", tone:"warm", beatFx:"none",
+      beatMode:"detect", fxInt:0.9, pump:0.8, titleTheme:"gold", subTheme:"white",
+      set:{kb:1,pump:1,moodShift:0,fade:1,fxOverlay:1,dust:1,cine:0,glowBoost:0,artFlow:0,beatCut:0,spot:0,vign:1,hueCycle:0,film:1}},
+
+    // ── 다이내믹·클럽 계열 (BPM 자동 발동) ───────────
+    edm:      {viz:"radial", mood:"neon", accent:"#3ECFB2", tone:"cool", beatFx:"mix",
+      beatMode:"bpm", bpmDiv:2, fxInt:2.2, pump:2.2, titleTheme:"neon", subTheme:"neon",
+      set:{kb:1,pump:1,moodShift:1,fade:1,fxOverlay:0,dust:0,cine:0,glowBoost:1,artFlow:1,beatCut:1,spot:0,vign:1,hueCycle:1,film:0}},
+    hiphop:   {viz:"bars", mood:"neon", accent:"#E8603C", tone:"cool", beatFx:"mix",
+      beatMode:"bpm", bpmDiv:1, fxInt:2.0, pump:2.0, titleTheme:"broadcast", subTheme:"yellow",
+      set:{kb:1,pump:1,moodShift:0,fade:1,fxOverlay:0,dust:0,cine:0,glowBoost:1,artFlow:0,beatCut:1,spot:0,vign:1,hueCycle:0,film:0}},
+    synthwave:{viz:"ridge", mood:"neon", accent:"#5B8CFF", tone:"cool", beatFx:"chroma",
+      beatMode:"bpm", bpmDiv:1, fxInt:2.0, pump:1.8, titleTheme:"neon", subTheme:"pink",
       set:{kb:1,pump:1,moodShift:0,fade:1,fxOverlay:0,dust:0,cine:1,glowBoost:1,artFlow:0,beatCut:0,spot:0,vign:1,hueCycle:0,film:1}},
+    club:     {viz:"tunnel", mood:"neon", accent:"#FF6FB5", tone:"cool", beatFx:"mix",
+      beatMode:"bpm", bpmDiv:2, fxInt:2.6, pump:2.4, titleTheme:"pink", subTheme:"neon",
+      set:{kb:0,pump:1,moodShift:1,fade:1,fxOverlay:0,dust:0,cine:0,glowBoost:1,artFlow:1,beatCut:1,spot:0,vign:1,hueCycle:1,film:0}},
+
+    // ── 숏폼·틱톡 계열 (화려·진행률) ─────────────────
+    tiktok:   {viz:"progring", mood:"neon", accent:"#FF6FB5", tone:"cool", beatFx:"mix",
+      beatMode:"bpm", bpmDiv:4, fxInt:2.8, pump:2.4, titleTheme:"pink", subTheme:"yellow",
+      set:{kb:1,pump:1,moodShift:1,fade:1,fxOverlay:0,dust:0,cine:0,glowBoost:1,artFlow:1,beatCut:1,spot:0,vign:1,hueCycle:1,film:0}},
+    vaporwave:{viz:"timeline", mood:"dusk", accent:"#5B8CFF", tone:"cool", beatFx:"vhs",
+      beatMode:"bpm", bpmDiv:1, fxInt:2.2, pump:1.6, titleTheme:"pink", subTheme:"mint",
+      set:{kb:1,pump:1,moodShift:0,fade:1,fxOverlay:1,dust:0,cine:1,glowBoost:1,artFlow:0,beatCut:0,spot:0,vign:1,hueCycle:0,film:1}},
+
+    // ── 한국 전통 계열 (유감독님 콘텐츠) ─────────────
+    dancheong:{viz:"mandala", mood:"dusk", accent:"#D9B36C", tone:"warm", beatFx:"mix",
+      beatMode:"bpm", bpmDiv:1, fxInt:1.8, pump:1.8, titleTheme:"gold", subTheme:"gold",
+      set:{kb:1,pump:1,moodShift:0,fade:1,fxOverlay:0,dust:1,cine:0,glowBoost:1,artFlow:1,beatCut:0,spot:0,vign:1,hueCycle:1,film:0}},
+    jangdan:  {viz:"radial", mood:"dusk", accent:"#E8603C", tone:"warm", beatFx:"mix",
+      beatMode:"bpm", bpmDiv:2, fxInt:2.4, pump:2.2, titleTheme:"gold", subTheme:"broadcast",
+      set:{kb:1,pump:1,moodShift:1,fade:1,fxOverlay:0,dust:1,cine:0,glowBoost:1,artFlow:1,beatCut:1,spot:0,vign:1,hueCycle:1,film:0}},
+  };
+  const LOOK_LABELS = {
+    cinematic:"🎬 시네마틱", ballad:"💗 발라드", minimal:"◽ 미니멀", lofi:"📻 로파이",
+    edm:"⚡ EDM", hiphop:"🎤 힙합", synthwave:"🌆 신스웨이브", club:"🪩 클럽",
+    tiktok:"📱 틱톡", vaporwave:"🌴 베이퍼웨이브", dancheong:"🏮 단청", jangdan:"🥁 장단",
   };
   const TOGGLE_IDS = {kb:"chipKb",pump:"chipPump",moodShift:"chipMood",fade:"chipFade",
     fxOverlay:"chipFx",dust:"chipDust",cine:"chipCine",glowBoost:"chipGlow",artFlow:"chipFlow",
@@ -6322,7 +6371,7 @@ function init(){
   const syncChip = (groupId, val)=>{
     for(const c of $(groupId).querySelectorAll(".chip")) c.classList.toggle("on", c.dataset.v===val);
   };
-  bindChips("presetLook", id=>{
+  function applyLook(id){
     const L = LOOKS[id]; if(!L) return;
     S.viz = L.viz;       syncChip("vizChips", L.viz);
     S.tone = L.tone;     syncChip("toneChips", L.tone);
@@ -6334,11 +6383,40 @@ function init(){
       S[k] = !!L.set[k];
       $(TOGGLE_IDS[k]).classList.toggle("on", S[k]);
     }
+    // 발동 방식 (비트 감지 / BPM 자동)
+    if(L.beatMode){
+      S.beatMode = L.beatMode; S.lastBpmPhase = -1;
+      syncChip("beatModeChips", L.beatMode);
+      $("beatDetectBox").style.display = L.beatMode==="detect" ? "block" : "none";
+      $("beatBpmBox").style.display = L.beatMode==="bpm" ? "block" : "none";
+    }
+    if(typeof L.bpmDiv === "number"){ S.bpmDiv = L.bpmDiv; syncChip("bpmDivChips", String(L.bpmDiv)); }
+    // 이펙트·펌핑 강도
+    if(typeof L.fxInt === "number"){
+      S.fxIntensity = L.fxInt; $("fxIntRange").value = L.fxInt;
+      $("fxIntLabel").textContent = `${L.fxInt>=2?"최강":L.fxInt>=1.3?"강":L.fxInt>=0.9?"보통":"약"} (${Math.round(L.fxInt*100)}%)`;
+    }
+    if(typeof L.pump === "number"){
+      S.pumpAmt = L.pump; $("pumpRange").value = L.pump;
+      $("pumpLabel").textContent = `${L.pump>=2?"최강":L.pump>=1.3?"강":L.pump>=0.9?"보통":"약"} (${Math.round(L.pump*100)}%)`;
+    }
+    // 제목·자막 색상 테마
+    if(L.titleTheme){ S.titleTheme = L.titleTheme; syncChip("titleThemeChips", L.titleTheme); }
+    if(L.subTheme){ S.subTheme = L.subTheme; syncChip("subThemeChips", L.subTheme); }
+    // 선택된 프리셋 하이라이트 (4개 그룹 전체에서)
+    for(const g of ["presetLook","presetLook2","presetLook3","presetLook4"])
+      for(const c of $(g).querySelectorAll(".chip")) c.classList.toggle("on", c.dataset.v===id);
     if(S.bgMode==="art"){ S.mood = L.mood; syncChip("moodChips", L.mood); refreshArt(true); }
     else drawFrame(null);
     updateDashboard();
-    toast("✓ 프리셋 적용됨 — 미리듣기로 확인해보세요");
-  });
+    toast(`✓ ${LOOK_LABELS[id]||id} 프리셋 적용 — 미리듣기로 확인해보세요`, 3000);
+  }
+  for(const g of ["presetLook","presetLook2","presetLook3","presetLook4"]){
+    $(g).addEventListener("click", e=>{
+      const b = e.target.closest(".chip"); if(!b) return;
+      applyLook(b.dataset.v);
+    });
+  }
 
   // ---------- 화면 구성 전체 초기화 ----------
   const LOOK_DEFAULTS = {
@@ -6369,7 +6447,8 @@ function init(){
     $("previewCanvas").classList.remove("dragmode");
     $("vscaleRange").value = 1; $("vscaleLabel").textContent = "100%";
     $("tscaleRange").value = 1; $("tscaleLabel").textContent = "100%";
-    for(const c of $("presetLook").querySelectorAll(".chip")) c.classList.remove("on");
+    for(const g of ["presetLook","presetLook2","presetLook3","presetLook4"])
+      for(const c of $(g).querySelectorAll(".chip")) c.classList.remove("on");
     if(S.bgMode==="art"){ S.mood = D.mood; syncChip("moodChips", D.mood); refreshArt(true); }
     else drawFrame(null);
     toast("↺ 화면 구성이 기본값으로 초기화되었습니다");
