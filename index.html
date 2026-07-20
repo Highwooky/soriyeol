@@ -468,16 +468,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   </div>
 
   <div class="subpane" data-p="effect">
-  <div class="label">배경 모션</div>
-  <div class="chips">
-    <button class="chip on" id="chipKb">켄번즈 줌</button>
-    <button class="chip on" id="chipPump">비트 펌핑</button>
-    <button class="chip" id="chipMood">무드 시프트</button>
-    <button class="chip" id="chipFlow">아트 흐름</button>
-    <button class="chip" id="chipSpot">스포트라이트</button>
-    <button class="chip" id="chipVign">비네트 펄스</button>
-  </div>
-  <div class="label">비트 이펙트 — 오토컷 스타일 (비트마다 자동 발동)</div>
+  <div class="label">⚡ 비트 이펙트 <span style="font-weight:400;color:var(--sub)">— 비트마다 자동 발동</span></div>
   <div class="chips" id="beatFxChips">
     <button class="chip on" data-v="none">없음</button>
     <button class="chip" data-v="zoom">줌 펀치</button>
@@ -487,8 +478,28 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
     <button class="chip" data-v="ghost">고스트</button>
     <button class="chip hot" data-v="mix">믹스 ✦</button>
   </div>
-  <div class="chips" style="margin-top:6px">
-    <button class="chip" id="chipBeatCut">비트 컷 전환 (플리 슬라이드)</button>
+  <div class="label">이펙트 강도: <b id="fxIntLabel" style="color:var(--text)">강 (140%)</b></div>
+  <input type="range" id="fxIntRange" min="0.5" max="3" step="0.1" value="1.4">
+  <div class="chips" style="margin-top:8px">
+    <button class="chip" id="chipBeatCut">비트 컷 전환 (플리)</button>
+  </div>
+
+  <div class="label" style="margin-top:16px">🎬 배경 모션</div>
+  <div class="chips">
+    <button class="chip on" id="chipKb">켄번즈 줌</button>
+    <button class="chip on" id="chipPump">비트 펌핑</button>
+    <button class="chip" id="chipMood">무드 시프트</button>
+    <button class="chip" id="chipFlow">아트 흐름</button>
+  </div>
+  <div class="label">펌핑 강도: <b id="pumpLabel" style="color:var(--text)">강 (140%)</b></div>
+  <input type="range" id="pumpRange" min="0.3" max="3" step="0.1" value="1.4">
+
+  <div class="label" style="margin-top:16px">✨ 조명 · 분위기</div>
+  <div class="chips">
+    <button class="chip" id="chipSpot">스포트라이트</button>
+    <button class="chip" id="chipVign">비네트 펄스</button>
+    <button class="chip" id="chipGlow">글로우+</button>
+    <button class="chip" id="chipHue">레인보우 글로우</button>
   </div>
   <div class="label">색감 톤</div>
   <div class="chips" id="toneChips">
@@ -497,17 +508,15 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
     <button class="chip" data-v="cool">쿨</button>
     <button class="chip" data-v="mono">모노</button>
   </div>
-  <div class="label">마감 효과</div>
+
+  <div class="label" style="margin-top:16px">🎞 마감 질감</div>
   <div class="chips">
     <button class="chip on" id="chipFade">페이드 인/아웃</button>
     <button class="chip" id="chipFx">그레인·빛샘</button>
     <button class="chip" id="chipDust">빛입자</button>
     <button class="chip" id="chipCine">시네마 바</button>
-    <button class="chip" id="chipGlow">글로우+</button>
-    <button class="chip" id="chipHue">레인보우 글로우</button>
     <button class="chip" id="chipFilm">필름 룩</button>
   </div>
-  
   </div>
 
   <div class="subpane" data-p="layout">
@@ -577,7 +586,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p class="notice" id="renderNote">렌더 중 다른 앱으로 이동하거나 화면을 잠그면 작업이 멈춥니다.</p>
 </section>
 
-<footer>LUMATONE v3.6 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v3.7 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -2562,6 +2571,8 @@ const S = {
   titleTheme: "white",
   tapSync: null,           // 탭 싱크 진행 상태
   fxKick: 0, fxCur: "zoom", glitchN: 0,
+  fxIntensity: 1.4,        // 비트 이펙트 강도 배율 (0.5~3.0) — 기본 강하게
+  pumpAmt: 1.4,            // 배경 펌핑 강도 배율
   cutIdx: 0, lastCutT: 0,
   vizPeaks: null,          // 피크 바용 피크 홀드
   particles: [],
@@ -2607,6 +2618,7 @@ function saveLook(){
     fastRender:S.fastRender,
     subOn:S.subOn, subMode:S.subMode, subPos:S.subPos, subStyle:S.subStyle, subScale:S.subScale, subs:S.subs,
     subFont:S.subFont, subY:S.subY, subTheme:S.subTheme, titleTheme:S.titleTheme,
+    fxIntensity:S.fxIntensity, pumpAmt:S.pumpAmt,
     dust:S.dust, cine:S.cine, glowBoost:S.glowBoost, artFlow:S.artFlow,
     vizPos:S.vizPos, vizScale:S.vizScale, textPos:S.textPos, textScale:S.textScale,
     artist: $("artistInput") ? $("artistInput").value : "",
@@ -3696,8 +3708,8 @@ function updateBeat(bass, dt, tSec){
   // 저역 에너지 이동평균 대비 급상승 = 비트 (감쇠형 펄스 생성)
   S.bassAvg += (bass - S.bassAvg) * Math.min(1, dt*1.2);
   S.beatCool = Math.max(0, S.beatCool - dt);
-  if(bass > S.bassAvg*1.35 + 0.03 && S.beatCool<=0 && bass>0.08){
-    S.beatPulse = 1; S.beatCool = 0.18;
+  if(bass > S.bassAvg*1.28 + 0.025 && S.beatCool<=0 && bass>0.07){
+    S.beatPulse = 1; S.beatCool = 0.16;
     if(S.viz==="burst") spawnBurst(Math.min(1, bass));
     // 비트 이펙트 발동 (믹스는 시드 난수로 결정론적 선택 → 고속 렌더에서도 동일)
     if(S.beatFx !== "none"){
@@ -3706,7 +3718,7 @@ function updateBeat(bass, dt, tSec){
       S.fxCur = S.beatFx==="mix"
         ? opts[Math.floor(mulberry32(1+Math.floor(tSec*997))()*opts.length)]
         : S.beatFx;
-      if(S.fxCur==="glitch") S.glitchN = 6;
+      if(S.fxCur==="glitch") S.glitchN = 8;
     }
     // 비트 컷: 플리 슬라이드를 비트에 맞춰 하드 컷 전환 (최소 1.2초 간격)
     if(S.beatCut && S.slides.length>1 && tSec - S.lastCutT > 1.2){
@@ -3759,7 +3771,7 @@ function stepParticles(dt){
 function drawKb(x, img, w, h, lp, seed, extraZoom, alpha){
   // 슬라이드별 시드로 줌 방향/팬 방향 고정 → 렌더 내내 일관된 움직임
   const rnd = mulberry32(seed);
-  const z0 = 1.05 + rnd()*0.03, z1 = 1.12 + rnd()*0.08;
+  const z0 = 1.06 + rnd()*0.04, z1 = 1.24 + rnd()*0.14;   // 줌 폭 확대 (더 역동적)
   const rev = rnd() < 0.5;
   const dx = rnd()*2-1, dy = rnd()*2-1;
   const t = S.kb ? Math.min(1, Math.max(0, lp)) : 0;
@@ -3768,24 +3780,25 @@ function drawKb(x, img, w, h, lp, seed, extraZoom, alpha){
   const s = Math.max(w/iw, h/ih) * z;
   const dw = iw*s, dh = ih*s;
   const panX = (dw-w)/2, panY = (dh-h)/2;
-  const ox = (w-dw)/2 + (S.kb ? dx*panX*(t*0.6-0.3) : 0);
-  const oy = (h-dh)/2 + (S.kb ? dy*panY*(t*0.6-0.3) : 0);
+  const ox = (w-dw)/2 + (S.kb ? dx*panX*(t*0.9-0.45) : 0);   // 팬 이동 폭 확대
+  const oy = (h-dh)/2 + (S.kb ? dy*panY*(t*0.9-0.45) : 0);
   x.globalAlpha = alpha;
   x.drawImage(img, ox, oy, dw, dh);
   x.globalAlpha = 1;
 }
 function drawBackground(x, w, h, progress, tSec){
-  let pumpZ = S.pump ? 1 + S.beatPulse*0.035 : 1;
+  let pumpZ = S.pump ? 1 + S.beatPulse*0.06*S.pumpAmt : 1;
   // 비트 이펙트: 줌 펀치 / 셰이크 (시드 난수 → 고속 렌더에서도 결정론적)
   let shx = 0, shy = 0;
+  const FI = S.fxIntensity;
   if(S.fxKick > 0.02){
     const k = S.fxKick;
-    if(S.fxCur==="zoom") pumpZ *= 1 + k*0.10;
+    if(S.fxCur==="zoom") pumpZ *= 1 + k*0.26*FI;        // 10% → 26%×강도 (확 확대)
     else if(S.fxCur==="shake"){
       const rnd = mulberry32(7+Math.floor(tSec*60));
-      shx = (rnd()*2-1)*k*w*0.02;
-      shy = (rnd()*2-1)*k*h*0.02;
-      pumpZ *= 1 + k*0.03;   // 흔들림으로 드러나는 가장자리 커버
+      shx = (rnd()*2-1)*k*w*0.055*FI;                   // 2% → 5.5%×강도
+      shy = (rnd()*2-1)*k*h*0.055*FI;
+      pumpZ *= 1 + k*0.09*FI;   // 흔들림으로 드러나는 가장자리 커버
     }
   }
   x.save();
@@ -4501,20 +4514,24 @@ function drawFrame(audio, progress, tOverride){
       x.fillRect(0, h-bar, w, bar);
     }
     // ---------- 비트 포스트 이펙트: 플래시 / 고스트 / 글리치 ----------
+    const FI = S.fxIntensity;
     if(S.fxKick > 0.03){
       const k = S.fxKick;
       if(S.fxCur==="flash"){
         x.globalCompositeOperation = "screen";
-        x.fillStyle = `rgba(255,255,255,${(k*0.4).toFixed(3)})`;
+        x.fillStyle = `rgba(255,255,255,${Math.min(0.9,k*0.7*FI).toFixed(3)})`;   // 0.4 → 0.7×강도
         x.fillRect(0,0,w,h);
         x.globalCompositeOperation = "source-over";
       }else if(S.fxCur==="ghost"){
         // 화면 자체를 좌우로 겹쳐 그려 잔상 분리 (스냅샷 기반이라 자기복사 안전)
-        const d = Math.max(2, w*0.012*k);
+        const d = Math.max(2, w*0.032*k*FI);   // 1.2% → 3.2%×강도 (잔상 뚜렷)
         x.globalCompositeOperation = "lighter";
-        x.globalAlpha = k*0.30;
+        x.globalAlpha = Math.min(0.7, k*0.5*FI);
         x.drawImage(c,  d, 0);
         x.drawImage(c, -d, 0);
+        // 색분리(크로마) 추가 — 시안/레드 고스트
+        x.globalAlpha = Math.min(0.4, k*0.3*FI);
+        x.drawImage(c, d*1.6, 0);
         x.globalAlpha = 1;
         x.globalCompositeOperation = "source-over";
       }
@@ -4522,16 +4539,23 @@ function drawFrame(audio, progress, tOverride){
     if(S.glitchN > 0){
       // 수평 슬라이스 찢김 — 프레임 시드 난수라 고속 렌더에서도 결정론적
       const rnd = mulberry32(1000 + Math.floor(tSec*30));
-      const amp = w*0.045*(S.glitchN/6);
-      for(let g=0; g<6; g++){
+      const amp = w*0.10*(S.glitchN/8)*FI;   // 4.5% → 10%×강도, 슬라이스도 증가
+      for(let g=0; g<10; g++){
         const sy = rnd()*h*0.92;
-        const sh = h*(0.01 + rnd()*0.05);
+        const sh = h*(0.01 + rnd()*0.06);
         const gx = (rnd()*2-1)*amp;
         x.drawImage(c, 0, sy, w, sh, gx, sy, w, sh);
       }
+      // RGB 색분리 스캔라인
+      x.globalCompositeOperation = "screen";
+      x.globalAlpha = 0.35*FI;
+      x.drawImage(c, w*0.008*FI, 0);
+      x.fillStyle = "#FF3366"; x.globalAlpha = 0.12*FI;
+      x.fillRect(0, rnd()*h, w, h*0.01);
+      x.globalCompositeOperation = "source-over";
       x.fillStyle = S.accent;
-      x.globalAlpha = 0.25;
-      x.fillRect(0, rnd()*h, w, Math.max(1, h*0.002));
+      x.globalAlpha = 0.3;
+      x.fillRect(0, rnd()*h, w, Math.max(1, h*0.003));
       x.globalAlpha = 1;
     }
     // ---------- 페이드 인/아웃 (영상) ----------
@@ -5422,7 +5446,7 @@ function init(){
   $("btnDesc").addEventListener("click", copyDescription);
   $("btnDiag").addEventListener("click", async ()=>{
     const info = {
-      app: "LUMATONE v3.6",
+      app: "LUMATONE v3.7",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
@@ -5800,6 +5824,17 @@ function init(){
   toggle("chipHue","hueCycle");
   toggle("chipFilm","film");
   bindChips("beatFxChips", v=>{ S.beatFx=v; if(!S.playing && !S.rendering) drawFrame(null); });
+  const fxLabel = v => v>=2 ? "최강" : v>=1.3 ? "강" : v>=0.9 ? "보통" : "약";
+  $("fxIntRange").addEventListener("input", e=>{
+    S.fxIntensity = parseFloat(e.target.value);
+    $("fxIntLabel").textContent = `${fxLabel(S.fxIntensity)} (${Math.round(S.fxIntensity*100)}%)`;
+    if(!S.playing && !S.rendering) drawFrame(null);
+  });
+  $("pumpRange").addEventListener("input", e=>{
+    S.pumpAmt = parseFloat(e.target.value);
+    $("pumpLabel").textContent = `${fxLabel(S.pumpAmt)} (${Math.round(S.pumpAmt*100)}%)`;
+    if(!S.playing && !S.rendering) drawFrame(null);
+  });
   bindChips("toneChips", v=>{ S.tone=v; if(!S.playing && !S.rendering) drawFrame(null); });
   $("wmInput").addEventListener("input", ()=>{ if(!S.playing && !S.rendering) drawFrame(null); });
 
@@ -6001,6 +6036,16 @@ function init(){
       if(L.subFont){
         selectFont(L.subFont, true);
         for(const el of $("subFontChips").querySelectorAll(".fontchip")) el.classList.toggle("on", el.dataset.v===L.subFont);
+      }
+      if(typeof L.fxIntensity === "number"){
+        S.fxIntensity = L.fxIntensity;
+        $("fxIntRange").value = L.fxIntensity;
+        $("fxIntLabel").textContent = `${L.fxIntensity>=2?"최강":L.fxIntensity>=1.3?"강":L.fxIntensity>=0.9?"보통":"약"} (${Math.round(L.fxIntensity*100)}%)`;
+      }
+      if(typeof L.pumpAmt === "number"){
+        S.pumpAmt = L.pumpAmt;
+        $("pumpRange").value = L.pumpAmt;
+        $("pumpLabel").textContent = `${L.pumpAmt>=2?"최강":L.pumpAmt>=1.3?"강":L.pumpAmt>=0.9?"보통":"약"} (${Math.round(L.pumpAmt*100)}%)`;
       }
       if(L.subStyle){ S.subStyle = L.subStyle; syncChip("subStyleChips", L.subStyle); }
       if(L.subTheme){ S.subTheme = L.subTheme; syncChip("subThemeChips", L.subTheme); }
