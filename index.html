@@ -480,8 +480,30 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   </div>
   <div class="label">이펙트 강도: <b id="fxIntLabel" style="color:var(--text)">강 (140%)</b></div>
   <input type="range" id="fxIntRange" min="0.5" max="3" step="0.1" value="1.4">
-  <div class="label">비트 반응 감도: <b id="beatSensLabel" style="color:var(--text)">높음 (160%)</b> <span style="font-weight:400;color:var(--sub)">— 높을수록 촘촘하게</span></div>
-  <input type="range" id="beatSensRange" min="0.5" max="3" step="0.1" value="1.6">
+
+  <div class="label">발동 방식</div>
+  <div class="chips" id="beatModeChips">
+    <button class="chip" data-v="detect">오디오 비트 감지</button>
+    <button class="chip on" data-v="bpm">박자마다 자동 ✦</button>
+  </div>
+
+  <div id="beatDetectBox" style="display:none">
+    <div class="label">비트 반응 감도: <b id="beatSensLabel" style="color:var(--text)">높음 (160%)</b></div>
+    <input type="range" id="beatSensRange" min="0.5" max="3" step="0.1" value="1.6">
+  </div>
+
+  <div id="beatBpmBox">
+    <div class="label">템포(BPM): <b id="bpmLabel" style="color:var(--text)">120</b>
+      <button class="chip" id="btnBpmAuto" style="margin-left:6px;padding:2px 10px">자동 감지</button></div>
+    <input type="range" id="bpmRange" min="60" max="180" step="1" value="120">
+    <div class="label">발동 빈도</div>
+    <div class="chips" id="bpmDivChips">
+      <button class="chip" data-v="0.5">½ (느긋)</button>
+      <button class="chip on" data-v="1">박자마다</button>
+      <button class="chip" data-v="2">2배 촘촘</button>
+      <button class="chip" data-v="4">4배 촘촘</button>
+    </div>
+  </div>
   <div class="chips" style="margin-top:8px">
     <button class="chip" id="chipBeatCut">비트 컷 전환 (플리)</button>
   </div>
@@ -588,7 +610,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p class="notice" id="renderNote">렌더 중 다른 앱으로 이동하거나 화면을 잠그면 작업이 멈춥니다.</p>
 </section>
 
-<footer>LUMATONE v3.8 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v3.9 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -2576,6 +2598,9 @@ const S = {
   fxIntensity: 1.4,        // 비트 이펙트 강도 배율 (0.5~3.0) — 기본 강하게
   pumpAmt: 1.4,            // 배경 펌핑 강도 배율
   beatSens: 1.6,           // 비트 감지 감도 (0.5~3.0) — 높을수록 촘촘하게 반응
+  beatMode: "detect",      // detect=오디오 비트감지 / bpm=BPM 주기 자동발동
+  bpm: 120, bpmDiv: 1,     // 템포(BPM), 분할(1=박자, 2=1/2박, 4=1/4박)
+  lastBpmPhase: -1,
   cutIdx: 0, lastCutT: 0,
   vizPeaks: null,          // 피크 바용 피크 홀드
   particles: [],
@@ -2622,6 +2647,7 @@ function saveLook(){
     subOn:S.subOn, subMode:S.subMode, subPos:S.subPos, subStyle:S.subStyle, subScale:S.subScale, subs:S.subs,
     subFont:S.subFont, subY:S.subY, subTheme:S.subTheme, titleTheme:S.titleTheme,
     fxIntensity:S.fxIntensity, pumpAmt:S.pumpAmt, beatSens:S.beatSens,
+    beatMode:S.beatMode, bpm:S.bpm, bpmDiv:S.bpmDiv,
     dust:S.dust, cine:S.cine, glowBoost:S.glowBoost, artFlow:S.artFlow,
     vizPos:S.vizPos, vizScale:S.vizScale, textPos:S.textPos, textScale:S.textScale,
     artist: $("artistInput") ? $("artistInput").value : "",
@@ -3379,6 +3405,12 @@ async function processAudio(){
     const tpChans = [];
     for(let c=0;c<S.tracks[0].proc.numberOfChannels;c++) tpChans.push(S.tracks[0].proc.getChannelData(c));
     S.truePeak = measureTruePeak(tpChans);
+    // 템포 자동 감지 (BPM 모드에서 바로 사용 가능하도록)
+    try{
+      const bpm = detectBPM(S.tracks[0].proc);
+      S.bpm = bpm; S.lastBpmPhase = -1;
+      $("bpmRange").value = bpm; $("bpmLabel").textContent = bpm;
+    }catch(e){ console.warn("[LUMATONE] BPM 감지 실패:", e); }
     $("mLufsOut").textContent = S.lufsOut.toFixed(1);
     $("mLufsOut").className = "v ok";
     // 타깃 대비 표시
@@ -3706,9 +3738,78 @@ function bandLevels(freq, n){
   return out;
 }
 
+// ============================================================
+// BPM 자동 감지 — 저역 온셋 포락선의 자기상관으로 템포 추정
+//   오프라인, numpy 없이 순수 JS. 60~180 BPM 범위 탐색.
+// ============================================================
+function detectBPM(buffer){
+  const sr = buffer.sampleRate;
+  const ch = buffer.getChannelData(0);
+  const n = ch.length;
+  // 1) 저역 에너지 포락선 (100Hz 저역통과 근사 + 다운샘플 → 100Hz 프레임레이트)
+  const fps = 100, hop = Math.floor(sr/fps);
+  const frames = Math.floor(n/hop);
+  const env = new Float32Array(frames);
+  let lp = 0;
+  const a = 0.02;   // 1차 저역통과 계수
+  for(let f=0; f<frames; f++){
+    let e = 0;
+    for(let i=0; i<hop; i++){
+      const s = ch[f*hop+i] || 0;
+      lp += a*(Math.abs(s) - lp);   // 저역 포락선
+      e += lp;
+    }
+    env[f] = e/hop;
+  }
+  // 2) 온셋 강조: 양의 차분 (에너지 상승 지점만)
+  const onset = new Float32Array(frames);
+  for(let f=1; f<frames; f++){
+    const d = env[f] - env[f-1];
+    onset[f] = d > 0 ? d : 0;
+  }
+  // 3) 자기상관: 60~180 BPM (lag = fps*60/BPM 프레임)
+  let bestBPM = 120, bestScore = -1;
+  for(let bpm=60; bpm<=180; bpm+=0.5){
+    const lag = Math.round(fps*60/bpm);
+    if(lag<1 || lag>=frames) continue;
+    let score = 0;
+    for(let f=lag; f<frames; f++) score += onset[f]*onset[f-lag];
+    // 옥타브 보정: 너무 빠른/느린 건 살짝 페널티
+    score *= 1 - Math.abs(bpm-120)/600;
+    if(score > bestScore){ bestScore = score; bestBPM = bpm; }
+  }
+  return Math.round(bestBPM);
+}
+
 // ---------- 비트 감지 & 파티클 ----------
 function updateBeat(bass, dt, tSec){
-  // 저역 에너지 이동평균 대비 급상승 = 비트 (감쇠형 펄스 생성)
+  // 모드 A: BPM 주기적 자동 발동 (규칙적으로 팍팍 — 비트 감지 실패와 무관)
+  if(S.beatMode === "bpm" && S.bpm > 0){
+    const interval = 60 / S.bpm / S.bpmDiv;   // 박자 간격(초). bpmDiv=2면 1/2박마다
+    const phase = Math.floor(tSec / interval);
+    if(phase !== S.lastBpmPhase){
+      S.lastBpmPhase = phase;
+      S.beatPulse = 1;
+      if(S.viz==="burst") spawnBurst(0.7);
+      if(S.beatFx !== "none"){
+        S.fxKick = 1;
+        const opts = ["zoom","flash","shake","glitch","ghost"];
+        S.fxCur = S.beatFx==="mix"
+          ? opts[phase % opts.length]   // 박자 순서대로 순환 (결정론적)
+          : S.beatFx;
+        if(S.fxCur==="glitch") S.glitchN = 8;
+      }
+      if(S.beatCut && S.slides.length>1){
+        S.cutIdx = (S.cutIdx + 1) % S.slides.length;
+      }
+    }
+    // 저역 펄스는 여전히 실제 오디오에 살짝 연동 (생동감)
+    S.bassAvg += (bass - S.bassAvg) * Math.min(1, dt*2);
+    S.beatPulse *= Math.pow(0.04, dt);
+    S.fxKick *= Math.pow(1e-4, dt);
+    return;
+  }
+  // 모드 B: 저역 에너지 이동평균 대비 급상승 = 비트 (기존 감지 방식)
   // beatSens(감도)가 높을수록: 임계값↓, 쿨다운↓, 최소 저역↓ → 더 촘촘하게 반응
   const sens = S.beatSens || 1.0;
   S.bassAvg += (bass - S.bassAvg) * Math.min(1, dt*(1.2 + sens*0.4));   // 감도↑ = 이동평균 빠르게 추종
@@ -5455,7 +5556,7 @@ function init(){
   $("btnDesc").addEventListener("click", copyDescription);
   $("btnDiag").addEventListener("click", async ()=>{
     const info = {
-      app: "LUMATONE v3.8",
+      app: "LUMATONE v3.9",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
@@ -5849,6 +5950,30 @@ function init(){
     S.beatSens = parseFloat(e.target.value);
     $("beatSensLabel").textContent = `${sensLabelTxt(S.beatSens)} (${Math.round(S.beatSens*100)}%)`;
   });
+  bindChips("beatModeChips", v=>{
+    S.beatMode = v;
+    S.lastBpmPhase = -1;
+    $("beatDetectBox").style.display = v==="detect" ? "block" : "none";
+    $("beatBpmBox").style.display = v==="bpm" ? "block" : "none";
+  });
+  $("bpmRange").addEventListener("input", e=>{
+    S.bpm = parseInt(e.target.value,10);
+    $("bpmLabel").textContent = S.bpm;
+    S.lastBpmPhase = -1;
+  });
+  bindChips("bpmDivChips", v=>{ S.bpmDiv = parseFloat(v); S.lastBpmPhase = -1; });
+  $("btnBpmAuto").addEventListener("click", ()=>{
+    if(!S.tracks.length || !S.tracks[0].proc){ toast("먼저 '사운드 적용'을 해주세요"); return; }
+    toast("템포 분석 중…", 1500);
+    setTimeout(()=>{
+      const bpm = detectBPM(S.tracks[0].proc);
+      S.bpm = bpm;
+      $("bpmRange").value = bpm;
+      $("bpmLabel").textContent = bpm;
+      S.lastBpmPhase = -1;
+      toast(`✓ 템포 감지: ${bpm} BPM (필요시 슬라이더로 조정)`, 3000);
+    }, 50);
+  });
   bindChips("toneChips", v=>{ S.tone=v; if(!S.playing && !S.rendering) drawFrame(null); });
   $("wmInput").addEventListener("input", ()=>{ if(!S.playing && !S.rendering) drawFrame(null); });
 
@@ -6066,6 +6191,14 @@ function init(){
         $("beatSensRange").value = L.beatSens;
         $("beatSensLabel").textContent = `${L.beatSens>=2.2?"최고":L.beatSens>=1.4?"높음":L.beatSens>=0.9?"보통":"낮음"} (${Math.round(L.beatSens*100)}%)`;
       }
+      if(L.beatMode){
+        S.beatMode = L.beatMode;
+        syncChip("beatModeChips", L.beatMode);
+        $("beatDetectBox").style.display = L.beatMode==="detect" ? "block" : "none";
+        $("beatBpmBox").style.display = L.beatMode==="bpm" ? "block" : "none";
+      }
+      if(typeof L.bpm === "number"){ S.bpm = L.bpm; $("bpmRange").value = L.bpm; $("bpmLabel").textContent = L.bpm; }
+      if(typeof L.bpmDiv === "number"){ S.bpmDiv = L.bpmDiv; syncChip("bpmDivChips", String(L.bpmDiv)); }
       if(L.subStyle){ S.subStyle = L.subStyle; syncChip("subStyleChips", L.subStyle); }
       if(L.subTheme){ S.subTheme = L.subTheme; syncChip("subThemeChips", L.subTheme); }
       if(L.titleTheme){ S.titleTheme = L.titleTheme; syncChip("titleThemeChips", L.titleTheme); }
