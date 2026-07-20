@@ -669,7 +669,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p style="font-size:.7rem;color:var(--sub);line-height:1.5;margin:6px 0 0">아주 긴 플리를 나눠서 렌더한 경우, 만든 영상들을 순서대로 선택하면 하나로 이어붙입니다 (앱 안에서 처리, 다른 프로그램 불필요). 같은 화질·비율로 만든 영상끼리 합치세요.</p>
 </section>
 
-<footer>LUMATONE v5.3 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v5.4 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -5598,14 +5598,26 @@ async function fastRender(){
       target = new Mp4Muxer.ArrayBufferTarget();
       DG.target = "arraybuffer";
     }
-    // fastStart:false → 샘플을 즉시 타겟에 쓰고 원본 참조 해제. moov는 파일 끝(스트리밍 호환).
+    // fastStart 객체 모드: moov를 파일 '앞'에 예약 공간으로 배치 → iOS에서 바로 재생 가능.
+    //   동시에 샘플은 스트리밍 타겟(OPFS)으로 즉시 써서 메모리에 안 쌓음.
+    //   expectedChunks는 상한이어야 하므로 넉넉히(+여유) 계산.
+    const expV = Math.ceil(frames * 1.05) + 30;                    // 비디오 청크 ≈ 프레임 수
+    const expA = Math.ceil(dur * projSR / 1024 * 1.05) + 30;       // 오디오 청크 ≈ 1024샘플 단위
+    let fsOpt;
+    if(useOpfs && DG.target === "opfs"){
+      fsOpt = {expectedVideoChunks: expV, expectedAudioChunks: expA};
+      DG.fastStart = "object(front-moov)";
+    }else{
+      fsOpt = "in-memory";   // 짧은 영상은 메모리로 빠르게 (moov 앞)
+      DG.fastStart = "in-memory";
+    }
     const muxer = new Mp4Muxer.Muxer({
       target,
       video: {codec:"avc", width:W, height:H},
       audio: {codec:"aac", sampleRate:projSR, numberOfChannels:2},
-      fastStart: false,
+      fastStart: fsOpt,
     });
-    DG.fastStart = false;
+    DG.expV = expV; DG.expA = expA;
     let gotDesc = false;
     ve = new VideoEncoder({
       output:(c,m)=>{
@@ -6118,7 +6130,7 @@ function init(){
     let last = S.diag;
     if(!last){ try{ last = store.get("lumatone.lastdiag"); }catch(e){} }
     const info = {
-      app: "LUMATONE v5.3",
+      app: "LUMATONE v5.4",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
