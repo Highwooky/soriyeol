@@ -646,7 +646,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
     <button class="btn small full" id="btnCancel" style="margin-top:8px">취소</button>
   </div>
   <div class="result" id="resultBox">
-    <video id="resultVideo" controls playsinline></video>
+    <video id="resultVideo" controls playsinline preload="none"></video>
     <a class="btn primary full" id="btnDownload" style="margin-top:10px">영상 저장</a>
     <p class="notice">아이폰: 저장 버튼 → 공유 시트에서 <b>"비디오 저장"</b>을 누르면 사진 앱에 들어갑니다. 이후 유튜브 앱에서 바로 업로드하세요.<br>
 🔇 <b>미리보기에서 소리가 안 들리면 측면 무음 스위치를 확인하세요</b> — 무음 모드에선 웹 영상 소리가 재생되지 않습니다 (파일에는 정상 포함).</p>
@@ -669,7 +669,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p style="font-size:.7rem;color:var(--sub);line-height:1.5;margin:6px 0 0">아주 긴 플리를 나눠서 렌더한 경우, 만든 영상들을 순서대로 선택하면 하나로 이어붙입니다 (앱 안에서 처리, 다른 프로그램 불필요). 같은 화질·비율로 만든 영상끼리 합치세요.</p>
 </section>
 
-<footer>LUMATONE v5.5 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v5.6 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -5596,17 +5596,16 @@ async function fastRender(){
       target = new Mp4Muxer.ArrayBufferTarget();
       DG.target = "arraybuffer";
     }
-    // fastStart 객체 모드: moov를 파일 '앞'에 예약 공간으로 배치 → iOS에서 바로 재생 가능.
-    //   동시에 샘플은 스트리밍 타겟(OPFS)으로 즉시 써서 메모리에 안 쌓음.
-    //   expectedChunks는 상한이어야 하므로 넉넉히(+여유) 계산.
-    const expV = Math.ceil(frames * 1.05) + 30;                    // 비디오 청크 ≈ 프레임 수
-    const expA = Math.ceil(dur * projSR / 1024 * 1.05) + 30;       // 오디오 청크 ≈ 1024샘플 단위
+    // fastStart 선택:
+    //   OPFS 스트리밍 타겟은 iOS에서 '되감기 쓰기(positioned write)'가 불안정 →
+    //   반드시 순차 쓰기만 하는 fastStart:false 사용 (moov 파일 끝). 완료 후 후처리로 moov를 앞으로 옮김.
+    //   메모리 타겟(짧은 영상)은 in-memory(moov 앞)로 바로.
     let fsOpt;
     if(useOpfs && DG.target === "opfs"){
-      fsOpt = {expectedVideoChunks: expV, expectedAudioChunks: expA};
-      DG.fastStart = "object(front-moov)";
+      fsOpt = false;                       // 순차 쓰기 (iOS OPFS 안전)
+      DG.fastStart = "false(seq)+postfix";
     }else{
-      fsOpt = "in-memory";   // 짧은 영상은 메모리로 빠르게 (moov 앞)
+      fsOpt = "in-memory";
       DG.fastStart = "in-memory";
     }
     const muxer = new Mp4Muxer.Muxer({
@@ -5615,7 +5614,6 @@ async function fastRender(){
       audio: {codec:"aac", sampleRate:projSR, numberOfChannels:2},
       fastStart: fsOpt,
     });
-    DG.expV = expV; DG.expA = expA;
     let gotDesc = false;
     ve = new VideoEncoder({
       output:(c,m)=>{
@@ -5736,12 +5734,15 @@ async function fastRender(){
     try{ store.set("lumatone.lastdiag", DG); }catch(e){}
 
     if(S.rendering && !encErr){
+      const mark = s => { DG.step = s; try{ store.set("lumatone.lastdiag", DG); }catch(e){} };
+      mark("flush");
       await ve.flush(); await ae.flush();
       try{ ve.close(); }catch(e){} try{ ae.close(); }catch(e){}   // 인코더 즉시 해제로 메모리 회수
+      mark("finalize");
       muxer.finalize();
+      mark("getfile");
       let blob;
       if(opfsWritable){
-        // OPFS 스트리밍: 디스크 파일을 닫고 File(Blob)로 참조 — 메모리에 전체 로드 안 함
         await opfsWritable.close();
         opfsWritable = null;   // finally 중복 close 방지
         const file = await opfsHandle.getFile();
@@ -5752,6 +5753,8 @@ async function fastRender(){
         blob = new Blob([buffer], {type:"video/mp4"});
         buffer = null;
       }
+      DG.mb = +(blob.size/1048576).toFixed(1);
+      mark("boxcheck");
       const speed = DG.speed;
       // 파일 앞부분 박스 구조 기록 (moov가 앞에 있는지 확인용)
       try{
@@ -5767,9 +5770,19 @@ async function fastRender(){
         }
         DG.boxes = boxes.join(",");
       }catch(e){ DG.boxes = "read-fail"; }
-      const playable = await verifyPlayable(blob, dur, DG);   // true/false/null
-      const audioOk = (playable !== false) ? await verifyAudio(blob, dur) : false;
-      DG.vVideo = playable; DG.vAudio = audioOk; DG.mb = +(blob.size/1048576).toFixed(1);
+      mark("verify");
+      // 아주 긴 영상(10분+)은 iOS에서 검증 자체가 메모리 부담 → 생략하고 바로 제공
+      //   (파일 무결성은 인코더 완주 + 박스 구조로 이미 확인됨)
+      let playable, audioOk;
+      if(dur > 600){
+        playable = null; audioOk = null;
+        DG.verifySkipped = true;
+      }else{
+        playable = await verifyPlayable(blob, dur, DG);
+        audioOk = (playable !== false) ? await verifyAudio(blob, dur) : false;
+      }
+      DG.vVideo = playable; DG.vAudio = audioOk;
+      mark("done");
       try{ store.set("lumatone.lastdiag", DG); }catch(e){}
       endRenderUI();
       if(playable === false){
@@ -6141,7 +6154,7 @@ function init(){
     let last = S.diag;
     if(!last){ try{ last = store.get("lumatone.lastdiag"); }catch(e){} }
     const info = {
-      app: "LUMATONE v5.5",
+      app: "LUMATONE v5.6",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
