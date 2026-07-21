@@ -669,7 +669,7 @@ footer{margin-top:28px;text-align:center;color:var(--sub);font-size:.7rem;line-h
   <p style="font-size:.7rem;color:var(--sub);line-height:1.5;margin:6px 0 0">아주 긴 플리를 나눠서 렌더한 경우, 만든 영상들을 순서대로 선택하면 하나로 이어붙입니다 (앱 안에서 처리, 다른 프로그램 불필요). 같은 화질·비율로 만든 영상끼리 합치세요.</p>
 </section>
 
-<footer>LUMATONE v5.4 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
+<footer>LUMATONE v5.5 · 완전 클라이언트사이드 — 음원은 폰 밖으로 나가지 않습니다<br>(AI 이미지 생성 사용 시에만 프롬프트가 외부로 전송됩니다)<br>Made by <b style="color:var(--accent)">Yu Byungwook</b></footer>
 </div>
 
 <div id="dimWrap"><div class="dimpct" id="dimPct">0%</div><div class="dimsub">렌더 진행 중 · 탭하면 돌아가기</div></div>
@@ -5302,19 +5302,17 @@ function extractAsc(desc){
 }
 
 // 결과물이 이 기기에서 실제로 재생 가능한지 즉석 검증 (4초 타임아웃)
-function verifyPlayable(blob, durSec){
+function verifyPlayable(blob, durSec, diag){
   return new Promise(res=>{
     const v = document.createElement("video");
     v.muted = true; v.playsInline = true; v.preload = "metadata";
     const u = URL.createObjectURL(blob);
     const done = ok => { clearTimeout(tm); v.removeAttribute("src"); URL.revokeObjectURL(u); res(ok); };
-    // moov가 파일 끝(fastStart:false)에 있으면 메타데이터 도달까지 파일을 많이 읽어야 함
-    //   → 파일 크기·길이에 비례해 타임아웃을 넉넉히 (긴 영상 오판 방지)
     const mb = blob.size/1048576;
     const timeout = Math.min(30000, Math.max(4000, mb*40, (durSec||0)*15));
-    const tm = setTimeout(()=>done(null), timeout);   // 시간 초과는 false 아닌 null(판정불가)
-    v.onloadedmetadata = ()=> done(isFinite(v.duration) && v.duration > 0);
-    v.onerror = ()=> done(false);
+    const tm = setTimeout(()=>{ if(diag) diag.vErr="timeout"; done(null); }, timeout);
+    v.onloadedmetadata = ()=>{ if(diag) diag.vDur=+(v.duration||0).toFixed(1); done(isFinite(v.duration) && v.duration > 0); };
+    v.onerror = ()=>{ if(diag){ diag.vErr = v.error ? ("code"+v.error.code) : "unknown"; } done(false); };
     v.src = u;
   });
 }
@@ -5755,8 +5753,21 @@ async function fastRender(){
         buffer = null;
       }
       const speed = DG.speed;
-      const playable = await verifyPlayable(blob, dur);   // true/false/null(판정불가)
-      // 긴 영상은 전체 오디오 디코딩을 피하고 재생 기반 판정 (메모리 폭발 방지)
+      // 파일 앞부분 박스 구조 기록 (moov가 앞에 있는지 확인용)
+      try{
+        const head = new Uint8Array(await blob.slice(0, 64).arrayBuffer());
+        let boxes = [], p = 0;
+        while(p+8 <= head.length){
+          const sz = (head[p]<<24)|(head[p+1]<<16)|(head[p+2]<<8)|head[p+3];
+          const tag = String.fromCharCode(head[p+4],head[p+5],head[p+6],head[p+7]);
+          boxes.push(tag);
+          if(sz<=0 || sz>blob.size) break;
+          if(boxes.length>=4) break;
+          p += sz;
+        }
+        DG.boxes = boxes.join(",");
+      }catch(e){ DG.boxes = "read-fail"; }
+      const playable = await verifyPlayable(blob, dur, DG);   // true/false/null
       const audioOk = (playable !== false) ? await verifyAudio(blob, dur) : false;
       DG.vVideo = playable; DG.vAudio = audioOk; DG.mb = +(blob.size/1048576).toFixed(1);
       try{ store.set("lumatone.lastdiag", DG); }catch(e){}
@@ -6130,7 +6141,7 @@ function init(){
     let last = S.diag;
     if(!last){ try{ last = store.get("lumatone.lastdiag"); }catch(e){} }
     const info = {
-      app: "LUMATONE v5.4",
+      app: "LUMATONE v5.5",
       ua: navigator.userAgent,
       webcodecs: {video: !!window.VideoEncoder, audio: !!window.AudioEncoder},
       fastOK: fastOK,
